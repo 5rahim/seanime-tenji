@@ -1,5 +1,7 @@
 import { MIN_SERVER_VERSION } from "@/lib/constants"
 
+export { MIN_SERVER_VERSION }
+
 type ParsedVersion = {
     major: number
     minor: number
