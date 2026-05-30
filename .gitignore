@@ -101,3 +101,4 @@ tools/
 !.github/
 .github/*
 !.github/workflows/
+latest-version.txt

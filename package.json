@@ -1,7 +1,7 @@
 {
   "name": "seanime-tenji",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "0.1.8",
   "scripts": {
     "dev:start": "expo start -c",
     "dev:start:ios": "expo start -c --ios",
@@ -21,6 +21,7 @@
     "internal:release:ios:github": "npm run internal:release:publish -- --platform ios",
     "internal:release:github": "npm run internal:release:publish -- --platform all",
     "internal:ota:publish": "node ./tools/publish-ota-update.mjs",
+    "internal:bump-version": "node ./tools/bump-version.mjs",
     "fix": "npx expo install --fix",
     "ios": "EXPO_OFFLINE=1 expo start -c --ios",
     "clean": "rm -rf .expo node_modules"

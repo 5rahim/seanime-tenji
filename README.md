@@ -7,7 +7,7 @@
 <h1 align="center"><b>Seanime Tenji</b></h1>
 
 <p align="center">
-<img src="https://seanime.app/bucket/tenji-player2.png" alt="preview" width="500px"/>
+<img src="https://seanime.app/bucket/img-20260530-115604-bh3pofrz--sq2.webp" alt="preview" width="100%"/>
 </p>
 
 <p align="center">
@@ -74,15 +74,6 @@ Seanime Tenji is built with React Native and Expo. Detailed guides on setup and 
 ### Local Build & Development Notes
 
 When building and testing Seanime Tenji locally, keep these integration requirements in mind:
-
-* **Metro Tunnel Mode**: If you encounter network issues between your mobile device and the host machine, you can launch Metro in tunnel mode:
-  ```bash
-  npx expo start --dev-client --host tunnel -c
-  ```
-  If Expo warns that `@expo/ngrok` is missing, install it with:
-  ```bash
-  npm install --no-save @expo/ngrok@^4.1.0
-  ```
 
 * **Physical iOS Devices & Signing**: To test on a physical iOS device, configure your Apple Developer Team ID inside a `.env.local` file at the root:
   ```env
