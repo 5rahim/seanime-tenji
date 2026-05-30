@@ -1,4 +1,6 @@
+import { useServerStatus } from "@/atoms/server.atoms"
 import { InlineSelect } from "@/components/shared/inline-select"
+import { LabeledSwitch } from "@/components/shared/labeled-switch"
 import { MultiToggle } from "@/components/shared/multi-toggle"
 import { SheetFooter, SheetFooterButton } from "@/components/shared/sheet-footer"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
@@ -38,6 +40,7 @@ export function SearchFilterSheet({
     params,
     onApply,
 }: SearchFilterSheetProps) {
+    const serverStatus = useServerStatus()
     const [draft, setDraft] = React.useState<SearchParams>(params)
 
     // Keep draft in sync when sheet opens from outside
@@ -197,6 +200,14 @@ export function SearchFilterSheet({
                         onToggle={toggleGenre}
                     />
                 </FormField>
+
+                {!!serverStatus?.settings?.anilist?.enableAdultContent && (
+                    <LabeledSwitch
+                        label="Adult Content"
+                        checked={draft.isAdult}
+                        onToggle={() => setDraft(d => ({ ...d, isAdult: !d.isAdult }))}
+                    />
+                )}
 
             </View>
         </SeaBottomSheet>

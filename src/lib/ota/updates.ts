@@ -1,3 +1,4 @@
+import { getStoredString, setStoredString } from "@/atoms/storage"
 import { isManualOfflineModeEnabled } from "@/lib/connection-state"
 import { toast } from "@/lib/utils/toast"
 import Constants from "expo-constants"
@@ -21,6 +22,7 @@ type OtaVersionInfo = {
 }
 
 const CHECK_DELAY_MS = 1200
+const DISMISSED_OTA_ID_KEY = "sea-ota-dismissed-id"
 
 export function OtaUpdatePrompt() {
     const promptShownRef = React.useRef(false)
@@ -90,8 +92,9 @@ export async function checkForOtaUpdateManually(): Promise<void> {
 
         promptInstallUpdate(result.manifest)
     }
-    catch {
-        toast.error("Failed to check for updates")
+    catch (error: any) {
+        console.error(error)
+        toast.error(`Failed to check for updates`)
     }
 }
 
@@ -114,6 +117,11 @@ async function checkForPromptableUpdate({
             return
         }
 
+        const updateId = result.manifest && typeof (result.manifest as any).id === "string" ? (result.manifest as any).id : undefined
+        if (updateId && getStoredString(DISMISSED_OTA_ID_KEY) === updateId) {
+            return
+        }
+
         markPromptShown()
         promptInstallUpdate(result.manifest)
     }
@@ -125,23 +133,32 @@ async function checkForPromptableUpdate({
 function promptInstallUpdate(manifest: unknown) {
     const extra = getSeanimeUpdateExtra(manifest)
     const versionLabel = extra.otaVersion ? `OTA ${extra.otaVersion}` : "A new update"
+    const updateId = isRecord(manifest) && typeof manifest.id === "string" ? manifest.id : undefined
 
     Alert.alert(
         "Update available",
         `${versionLabel} is ready to install.`,
         [
-            { text: "Later", style: "cancel" },
+            {
+                text: "Later",
+                style: "cancel",
+                onPress: () => {
+                    if (updateId) {
+                        setStoredString(DISMISSED_OTA_ID_KEY, updateId)
+                    }
+                },
+            },
             {
                 text: "Install",
                 onPress: () => {
-                    void fetchAndPromptReload(extra.otaVersion)
+                    void fetchAndPromptReload(updateId, extra.otaVersion)
                 },
             },
         ],
     )
 }
 
-async function fetchAndPromptReload(otaVersion: string | undefined) {
+async function fetchAndPromptReload(updateId: string | undefined, otaVersion: string | undefined) {
     try {
         const result = await Updates.fetchUpdateAsync()
         if (!result.isNew && !result.isRollBackToEmbedded) {
@@ -164,8 +181,12 @@ async function fetchAndPromptReload(otaVersion: string | undefined) {
             ],
         )
     }
-    catch {
-        toast.error("Failed to download update")
+    catch (error: any) {
+        console.error(error)
+        if (updateId) {
+            setStoredString(DISMISSED_OTA_ID_KEY, updateId)
+        }
+        toast.error(`Failed to download update: ${error?.message || error}`)
     }
 }
 

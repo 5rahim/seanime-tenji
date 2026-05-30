@@ -99,6 +99,10 @@ function redactSensitiveText(value: string): string {
         .replace(/([?&](?:token|proof|auth|authorization|access_token|refresh_token|api_key|apikey)=)[^&\s"]+/gi, `$1[redacted]`)
         .replace(/("(?:token|proof|auth|authorization|accessToken|refreshToken|apiKey|api_key)"\s*:\s*")[^"]+"/gi, `$1[redacted]"`)
         .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, "$1[redacted]")
+        .replace(/\/Users\/.+?\/seanime-tenji\//g, "[sea]/")
+        .replace(/\/home\/.+?\/seanime-tenji\//g, "[sea]/")
+        .replace(/\/Users\/[A-Za-z0-9_-]+\//g, "/[sailor]/")
+        .replace(/\/home\/[A-Za-z0-9_-]+\//g, "/[sailor]/")
 }
 
 function sanitizeEntryForExport(entry: OfflineLogEntry): OfflineLogEntry {

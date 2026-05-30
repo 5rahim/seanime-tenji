@@ -98,5 +98,6 @@ export function getActiveFiltersCount(params: SearchParams): number {
     if (params.year !== null) count++
     if (params.minScore !== null) count++
     if (params.countryOfOrigin !== null && params.type === "manga") count++
+    if (params.isAdult) count++
     return count
 }
