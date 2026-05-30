@@ -113,7 +113,7 @@ export function useContinuitySync(
                 mediaId: source.mediaId,
                 malId: source.media?.idMal,
                 episodeNumber: source.episodeNumber,
-                totalEpisodes: source.media?.episodes ?? Math.max(source.episodeNumber, source.entryListData?.progress ?? 0, 1),
+                totalEpisodes: source.media?.episodes || 0,
             })
         }
     }, [source, playerState.currentTime, playerState.duration, playerState.eofReached, updateAnimeProgress])
