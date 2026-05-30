@@ -32,6 +32,8 @@ export {
     usePlayerEventListener,
     useStartOnlineStreamPlayback,
     useCleanupPlaybackSession,
+    useActivePlaybackSource,
+    resolvePlaybackMetadataFromCache,
 } from "./session"
 
 export type {

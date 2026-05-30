@@ -1,7 +1,18 @@
 import { getServerBaseUrl } from "@/api/client/server-url"
-import type { AL_BaseAnime, Anime_EntryListData, Anime_Episode, DebridClient_StreamState, Torrentstream_TorrentStatus } from "@/api/generated/types"
+import { API_ENDPOINTS } from "@/api/generated/endpoints"
+import type {
+    AL_AnimeCollection,
+    AL_BaseAnime,
+    Anime_Entry,
+    Anime_EntryListData,
+    Anime_Episode,
+    Anime_LibraryCollection,
+    DebridClient_StreamState,
+    Torrentstream_TorrentStatus,
+} from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
 import { websocketAtom } from "@/atoms/websocket.atoms"
+import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "expo-router"
 import { atom, useAtom } from "jotai"
 import { useAtomValue } from "jotai/react"
@@ -10,11 +21,124 @@ import { openExternalPlayerURL } from "./external-players"
 import { getPlayerPreferences } from "./player-preferences"
 import type { AnimeEntryLaunchView, MobilePlaybackSource, PlayerNextEpisodeAction } from "./types"
 
-///////////////////////////////////////////////////////////////////////////////
-// Atoms
-///////////////////////////////////////////////////////////////////////////////
-
 export const currentPlaybackSourceAtom = atom<MobilePlaybackSource | null>(null)
+
+export function resolvePlaybackMetadataFromCache(
+    queryClient: any,
+    mediaId: number | undefined,
+    episodeNumber: number | undefined,
+    initial: {
+        media?: AL_BaseAnime
+        episode?: Anime_Episode
+        entryListData?: Anime_EntryListData
+    } = {},
+) {
+    let media = initial.media
+    let episode = initial.episode
+    let entryListData = initial.entryListData
+
+    if (!mediaId || mediaId <= 0) {
+        return { media, episode, entryListData }
+    }
+
+    const entryCache = queryClient.getQueryData([
+        API_ENDPOINTS.ANIME_ENTRIES.GetAnimeEntry.key,
+        String(mediaId),
+    ]) as Anime_Entry | undefined
+
+    if (entryCache) {
+        if (!media) media = entryCache.media
+        if (!entryListData) entryListData = entryCache.listData
+        if (!episode && episodeNumber && episodeNumber > 0 && entryCache.episodes) {
+            episode = entryCache.episodes.find(e => e.episodeNumber === episodeNumber)
+        }
+    }
+
+    if (!media || !episode || !entryListData) {
+        const allEntries = queryClient.getQueriesData({
+            queryKey: [API_ENDPOINTS.ANIME_ENTRIES.GetAnimeEntry.key],
+        }) as [unknown, Anime_Entry | undefined][]
+        for (const [, data] of allEntries) {
+            if (data?.mediaId === mediaId) {
+                if (!media) media = data.media
+                if (!entryListData) entryListData = data.listData
+                if (!episode && episodeNumber && episodeNumber > 0 && data.episodes) {
+                    episode = data.episodes.find(e => e.episodeNumber === episodeNumber)
+                }
+                break
+            }
+        }
+    }
+
+    if (!media || !entryListData) {
+        const libCollection = queryClient.getQueryData([
+            API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key,
+        ]) as Anime_LibraryCollection | undefined
+        if (libCollection?.lists) {
+            for (const list of libCollection.lists) {
+                if (list.entries) {
+                    const entry = list.entries.find(e => e.mediaId === mediaId)
+                    if (entry) {
+                        if (!media) media = entry.media
+                        if (!entryListData) entryListData = entry.listData
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    if (!media) {
+        const animeCollection = queryClient.getQueryData([
+            API_ENDPOINTS.ANILIST.GetAnimeCollection.key,
+        ]) as AL_AnimeCollection | undefined
+        if (animeCollection?.MediaListCollection?.lists) {
+            for (const list of animeCollection.MediaListCollection.lists) {
+                if (list.entries) {
+                    const entry = list.entries.find(e => e.media?.id === mediaId)
+                    if (entry?.media) {
+                        media = entry.media
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    return { media, episode, entryListData }
+}
+
+export function useActivePlaybackSource(): MobilePlaybackSource | null {
+    const rawSource = useAtomValue(currentPlaybackSourceAtom)
+    const queryClient = useQueryClient()
+
+    return React.useMemo(() => {
+        if (!rawSource) return null
+
+        if (rawSource.media && rawSource.episode && rawSource.entryListData) {
+            return rawSource
+        }
+
+        const hydrated = resolvePlaybackMetadataFromCache(
+            queryClient,
+            rawSource.mediaId,
+            rawSource.episodeNumber,
+            {
+                media: rawSource.media,
+                episode: rawSource.episode,
+                entryListData: rawSource.entryListData,
+            },
+        )
+
+        return {
+            ...rawSource,
+            media: hydrated.media,
+            episode: hydrated.episode,
+            entryListData: hydrated.entryListData,
+        }
+    }, [rawSource, queryClient])
+}
+
 
 export const playerOpenAtom = atom(false)
 
@@ -303,6 +427,7 @@ export function usePlayerEventListener() {
     const socket = useAtomValue(websocketAtom)
     const serverUrl = useServerUrl()
     const router = useRouter()
+    const queryClient = useQueryClient()
 
     const [, setSource] = useAtom(currentPlaybackSourceAtom)
     const [, setPlayerOpen] = useAtom(playerOpenAtom)
@@ -494,15 +619,30 @@ export function usePlayerEventListener() {
 
                     const pending = pendingInfoRef.current
                     const streamPrefix = pending?.streamMode === "debrid" ? "debridstream" : "torrentstream"
+
+                    const hydrated = resolvePlaybackMetadataFromCache(
+                        queryClient,
+                        payload.mediaId,
+                        payload.episodeNumber,
+                        {
+                            media: pending?.media,
+                            episode: pending?.episode,
+                            entryListData: pending?.entryListData,
+                        },
+                    )
+                    const media = hydrated.media
+                    const episode = hydrated.episode
+                    const entryListData = hydrated.entryListData
+
                     const source: MobilePlaybackSource = {
                         id: `${streamPrefix}-${payload.mediaId}-${payload.episodeNumber}-${Date.now()}`,
                         streamKind: "http",
                         url: resolvedUrl,
                         mediaId: pending?.mediaId ?? payload.mediaId,
                         episodeNumber: pending?.episodeNumber ?? payload.episodeNumber,
-                        media: pending?.media,
-                        episode: pending?.episode,
-                        entryListData: pending?.entryListData,
+                        media,
+                        episode,
+                        entryListData,
                         entryView: pending?.entryView,
                         nextEpisodeAction: pending?.nextEpisodeAction,
                         continuityKind: "external_player",
@@ -581,7 +721,7 @@ export function useStartOnlineStreamPlayback() {
  * Called from the player route when it unmounts.
  */
 export function useCleanupPlaybackSession() {
-    const [, setSource] = useAtom(currentPlaybackSourceAtom)
+    const [source, setSource] = useAtom(currentPlaybackSourceAtom)
     const [, setPlayerOpen] = useAtom(playerOpenAtom)
     const [, setLoadingMessage] = useAtom(playerLoadingMessageAtom)
     const [, setError] = useAtom(playerErrorAtom)
@@ -599,7 +739,12 @@ export function useCleanupPlaybackSession() {
             setPlayerOpen(false)
             setLoadingMessage(null)
             setError(null)
-            setPendingInfo(null)
+            setPendingInfo(current => {
+                if (current && source && (current.mediaId !== source.mediaId || current.episodeNumber !== source.episodeNumber)) {
+                    return current
+                }
+                return null
+            })
             setStreamSessionMode(null)
             setIsPreparing(false)
             setTorrentLoadingState(null)

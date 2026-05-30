@@ -1,4 +1,4 @@
-import { currentPlaybackSourceAtom, playerErrorAtom, playerLoadingMessageAtom } from "@/lib/player"
+import { playerErrorAtom, playerLoadingMessageAtom } from "@/lib/player"
 import type { MobilePlaybackSource, PlayerState } from "@/lib/player"
 import { logger } from "@/lib/utils/logger"
 import type {
@@ -15,6 +15,7 @@ import type {
 import { useAtomValue } from "jotai/react"
 import React from "react"
 import { findPreferredTrack, getPlayerPreferences, setPlayerPreferences } from "./player-preferences"
+import { useActivePlaybackSource } from "./session"
 
 const log = logger("use-mpv-player")
 
@@ -73,7 +74,7 @@ const INITIAL_STATE: PlayerState = {
  * - Handles auto track selection, preferences, and cleanup
  */
 export function useMpvPlayer() {
-    const source = useAtomValue(currentPlaybackSourceAtom)
+    const source = useActivePlaybackSource()
     const loadingMessage = useAtomValue(playerLoadingMessageAtom)
     const error = useAtomValue(playerErrorAtom)
 

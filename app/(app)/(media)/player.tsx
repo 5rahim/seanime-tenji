@@ -18,7 +18,13 @@ import { PlayerPanelOverlay } from "@/components/features/player/player-panel"
 import type { PlayerPanel } from "@/components/features/player/types"
 import { createGestureRefs, syncGestureRef } from "@/components/features/player/types"
 import { useIsServerConnected } from "@/lib/offline"
-import { currentPlaybackSourceAtom, playerErrorAtom, playerLoadingMessageAtom, useCleanupPlaybackSession } from "@/lib/player"
+import {
+    currentPlaybackSourceAtom,
+    playerErrorAtom,
+    playerLoadingMessageAtom,
+    useActivePlaybackSource,
+    useCleanupPlaybackSession,
+} from "@/lib/player"
 import type { PlayerChapter } from "@/lib/player"
 import { getLocalEpisodePlaybackSource } from "@/lib/player"
 import { usePlayerPreferences } from "@/lib/player/player-preferences"
@@ -78,7 +84,8 @@ function PlayerScreenInner() {
     }, [cleanupSession])
 
     // atoms
-    const [source, setSource] = useAtom(currentPlaybackSourceAtom)
+    const source = useActivePlaybackSource()
+    const [, setSource] = useAtom(currentPlaybackSourceAtom)
     const [, setPlaybackIntent] = useAtom(animeEntryPlaybackIntentAtom)
     const loadingMessage = useAtomValue(playerLoadingMessageAtom)
     const error = useAtomValue(playerErrorAtom)
