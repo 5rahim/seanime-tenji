@@ -43,6 +43,7 @@ export type PlayerPreferences = {
     centerTapPlayPause: boolean
     /** Whether side vertical swipes adjust brightness and volume. */
     sideSwipeBrightnessVolume: boolean
+    autoSkipOpEd: boolean
     /** User-provided Wyzie Subs API key for external subtitle search. */
     wyzieApiKey: string
     /**
@@ -68,6 +69,7 @@ const DEFAULTS: PlayerPreferences = {
     autoNextEpisode: true,
     centerTapPlayPause: true,
     sideSwipeBrightnessVolume: true,
+    autoSkipOpEd: false,
     wyzieApiKey: "",
     externalPlayerTemplate: null,
 }

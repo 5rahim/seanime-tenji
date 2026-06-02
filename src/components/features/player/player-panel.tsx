@@ -117,6 +117,7 @@ export interface PlayerPanelOverlayProps {
     onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void
     onToggleSideSwipeControls?: () => void
+    onToggleAutoSkipOpEd?: () => void
     onLockScreen?: () => void
 }
 
@@ -178,6 +179,7 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
                             onToggleAutoNext={props.onToggleAutoNext}
                             onToggleCenterTapPlayPause={props.onToggleCenterTapPlayPause}
                             onToggleSideSwipeControls={props.onToggleSideSwipeControls}
+                            onToggleAutoSkipOpEd={props.onToggleAutoSkipOpEd}
                             onLockScreen={props.onLockScreen}
                         />
                     )}
@@ -329,16 +331,17 @@ function PanelSelectableRow({
 
 function MainSettingsContent({
     state, prefs, onNavigate, onStartPiP, onToggleAutoNext,
-    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onLockScreen,
+    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onLockScreen,
 }: {
     state: PlayerStateType; prefs: PlayerPreferences; onNavigate: (p: PlayerPanel) => void
     onStartPiP?: () => void; onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void; onToggleSideSwipeControls?: () => void
+    onToggleAutoSkipOpEd?: () => void
     onLockScreen?: () => void
 }) {
     const rows: Array<{
         label: string; value: string; panel: PlayerPanel; icon: React.ReactNode
-        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe"
+        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed"
     }> = [
         {
             label: "Playback Speed",
@@ -365,6 +368,14 @@ function MainSettingsContent({
             icon: <SkipForward size={15} color="rgba(255,255,255,0.6)" />,
             accent: prefs.autoNextEpisode ? BRAND_ACCENT : undefined,
             action: "toggle-auto-next",
+        },
+        {
+            label: "Auto Skip OP / ED",
+            value: prefs.autoSkipOpEd ? "On" : "Off",
+            panel: "main",
+            icon: <SkipForward size={15} color="rgba(255,255,255,0.6)" />,
+            accent: prefs.autoSkipOpEd ? BRAND_ACCENT : undefined,
+            action: "toggle-auto-skip-op-ed",
         },
         {
             label: "Tap to Play & Pause",
@@ -407,6 +418,7 @@ function MainSettingsContent({
                 onStartPiP={onStartPiP} onToggleAutoNext={onToggleAutoNext}
                 onToggleCenterTapPlayPause={onToggleCenterTapPlayPause}
                 onToggleSideSwipeControls={onToggleSideSwipeControls}
+                onToggleAutoSkipOpEd={onToggleAutoSkipOpEd}
                 onLockScreen={onLockScreen}
             />
         </View>
@@ -1103,15 +1115,16 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function SettingsCard({
     rows, onNavigate, onStartPiP, onToggleAutoNext,
-    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onLockScreen,
+    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onLockScreen,
 }: {
     rows: Array<{
         label: string; value: string; panel: PlayerPanel; icon: React.ReactNode
-        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe"
+        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed"
     }>
     onNavigate: (p: PlayerPanel) => void
     onStartPiP?: () => void; onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void; onToggleSideSwipeControls?: () => void
+    onToggleAutoSkipOpEd?: () => void
     onLockScreen?: () => void
 }) {
     return (
@@ -1125,6 +1138,7 @@ function SettingsCard({
                         else if (row.action === "toggle-auto-next" && onToggleAutoNext) onToggleAutoNext()
                         else if (row.action === "toggle-center-tap" && onToggleCenterTapPlayPause) onToggleCenterTapPlayPause()
                         else if (row.action === "toggle-side-swipe" && onToggleSideSwipeControls) onToggleSideSwipeControls()
+                        else if (row.action === "toggle-auto-skip-op-ed" && onToggleAutoSkipOpEd) onToggleAutoSkipOpEd()
                         else if (row.action === "lock" && onLockScreen) onLockScreen()
                         else onNavigate(row.panel)
                     }}

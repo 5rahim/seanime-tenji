@@ -105,6 +105,12 @@ interface ControlsOverlayProps {
     seekBarProgress: SharedValue<number>
 }
 
+function isSkippableChapter(title?: string) {
+    if (!title) return false
+    const normalized = title.trim().toLowerCase()
+    return /opening$|^opening\s|^op$|ending$|^ending\s|^ed$|^credits/i.test(normalized)
+}
+
 export function ControlsOverlay(props: ControlsOverlayProps) {
     const {
         source, state, insets, zoomMode, panel,
@@ -128,6 +134,7 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
         if (!chapters || chapters.length === 0) {
             return [{
                 id: 0,
+                title: undefined as string | undefined,
                 start: 0,
                 end: duration,
                 duration: duration,
@@ -146,6 +153,7 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
             const segDuration = Math.max(0.1, end - start)
             list.push({
                 id: sorted[i].id,
+                title: sorted[i].title,
                 start,
                 end,
                 duration: segDuration,
@@ -245,26 +253,29 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
                             />
 
                             <Animated.View className="w-full flex-row items-center gap-[3px]" style={seekBarTrackStyle}>
-                                {segments.map((segment, index) => (
-                                    <View
-                                        key={index}
-                                        style={{
-                                            flexGrow: segment.duration,
-                                            flexShrink: 1,
-                                            flexBasis: 0,
-                                            height: "100%",
-                                            backgroundColor: "rgba(255,255,255,0.2)",
-                                            borderRadius: 999,
-                                            overflow: "hidden",
-                                        }}
-                                    >
-                                        <SegmentFill
-                                            seekBarProgress={seekBarProgress}
-                                            startProgress={segment.startProgress}
-                                            endProgress={segment.endProgress}
-                                        />
-                                    </View>
-                                ))}
+                                {segments.map((segment, index) => {
+                                    const skippable = isSkippableChapter(segment.title)
+                                    return (
+                                        <View
+                                            key={index}
+                                            style={{
+                                                flexGrow: segment.duration,
+                                                flexShrink: 1,
+                                                flexBasis: 0,
+                                                height: "100%",
+                                                backgroundColor: skippable ? "rgba(147, 197, 253, 0.45)" : "rgba(255,255,255,0.2)",
+                                                borderRadius: 999,
+                                                overflow: "hidden",
+                                            }}
+                                        >
+                                            <SegmentFill
+                                                seekBarProgress={seekBarProgress}
+                                                startProgress={segment.startProgress}
+                                                endProgress={segment.endProgress}
+                                            />
+                                        </View>
+                                    )
+                                })}
                             </Animated.View>
 
                             <Animated.View

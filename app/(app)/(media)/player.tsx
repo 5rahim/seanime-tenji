@@ -10,6 +10,7 @@ import { useDoubleTapSeek } from "@/components/features/player/hooks/use-double-
 import { useLandscapeOrientationLock } from "@/components/features/player/hooks/use-landscape-orientation-lock"
 import { usePlayerGestures } from "@/components/features/player/hooks/use-player-gestures"
 import { useSideAdjust } from "@/components/features/player/hooks/use-side-adjust"
+import { useSkipData } from "@/components/features/player/hooks/use-skip-data"
 import { useSwipeSeek } from "@/components/features/player/hooks/use-swipe-seek"
 import { AutoNextCard, NextEpisodeConfirmCard } from "@/components/features/player/player-auto-next"
 import { ControlsOverlay, LockModeOverlay } from "@/components/features/player/player-controls"
@@ -31,16 +32,18 @@ import { usePlayerPreferences } from "@/lib/player/player-preferences"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { useContinuitySync } from "@/lib/player/use-continuity-sync"
 import { useMpvPlayer } from "@/lib/player/use-mpv-player"
+import { cn } from "@/lib/utils"
 import { toast } from "@/lib/utils/toast"
 import { useKeepAwake } from "expo-keep-awake"
 import { MpvPlayerView } from "expo-mpv-player"
 import * as NavigationBar from "expo-navigation-bar"
 import { useRouter } from "expo-router"
 import { useAtom, useAtomValue } from "jotai/react"
+import { SkipForward } from "lucide-react-native"
 import React from "react"
 import { ActivityIndicator, Platform, StatusBar, Text, useWindowDimensions, View } from "react-native"
 import { Gesture, GestureDetector, GestureHandlerRootView, Pressable } from "react-native-gesture-handler"
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
+import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -55,6 +58,7 @@ const DEFAULT_TEXT_SUBTITLE_MARGIN_Y = 34
 const SEEK_SNAP_MAX_THRESHOLD = 4
 const SEEK_SNAP_DURATION_RATIO = 0.02
 const SEEK_SNAP_VERTICAL_DECAY = 15
+
 
 function isAssSubtitleCodec(codec?: string) {
     if (!codec) return false
@@ -162,6 +166,20 @@ function PlayerScreenInner() {
             start: chapter.start,
             title: chapter.text,
         }))
+
+    const {
+        skipData,
+        showSkipIntro,
+        showSkipOutro,
+    } = useSkipData({
+        source,
+        chapters,
+        duration: state.duration,
+        currentTime: state.currentTime,
+        status: state.status,
+        autoSkipOpEd: prefs.autoSkipOpEd,
+        playerSeekTo,
+    })
 
     const videoAspectRatio = getSourceVideoAspectRatio(source)
     const fillZoomScale = getFillZoomScale(screenWidth, screenHeight, videoAspectRatio)
@@ -963,6 +981,40 @@ function PlayerScreenInner() {
                     />
                 )}
 
+                {!isPiPActive && !controls.controlsLocked && (showSkipIntro || showSkipOutro) && (
+                    <Animated.View
+                        entering={FadeIn.duration(200)}
+                        exiting={FadeOut.duration(150)}
+                        style={{
+                            position: "absolute",
+                            bottom: Math.max(80, insets.bottom + 64),
+                            right: Math.max(20, insets.right + 20),
+                            zIndex: 50,
+                        }}
+                    >
+                        <Pressable
+                            onPress={() => {
+                                const targetTime = showSkipIntro ? skipData.op!.interval.endTime : skipData.ed!.interval.endTime
+                                playerSeekTo(targetTime)
+                                toast.info(showSkipIntro ? "Skipped opening intro" : "Skipped ending outro")
+                            }}
+                        >
+                            {({ pressed }) => (
+                                <View
+                                    className={cn(
+                                        "flex-row items-center gap-1.5 rounded-full border border-white/5 bg-black/60 px-3 py-1.5",
+                                        pressed ? "opacity-75 bg-white/5" : "opacity-100",
+                                    )}
+                                >
+                                    <Text className="text-xs font-medium text-white/90">
+                                        {showSkipIntro ? "Skip Intro" : "Skip Outro"}
+                                    </Text>
+                                    <SkipForward size={11} color="rgba(255,255,255,0.9)" />
+                                </View>
+                            )}
+                        </Pressable>
+                    </Animated.View>
+                )}
 
                 {panel && !isPiPActive && (
                     <PlayerPanelOverlay
@@ -989,6 +1041,7 @@ function PlayerScreenInner() {
                         onToggleAutoNext={() => updatePrefs({ autoNextEpisode: !prefs.autoNextEpisode })}
                         onToggleCenterTapPlayPause={() => updatePrefs({ centerTapPlayPause: !prefs.centerTapPlayPause })}
                         onToggleSideSwipeControls={() => updatePrefs({ sideSwipeBrightnessVolume: !prefs.sideSwipeBrightnessVolume })}
+                        onToggleAutoSkipOpEd={() => updatePrefs({ autoSkipOpEd: !prefs.autoSkipOpEd })}
                         onLockScreen={controls.lockScreen}
                         episodes={source?.episodes}
                         currentEpisodeNumber={source?.episodeNumber}
