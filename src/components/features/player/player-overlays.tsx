@@ -2,7 +2,7 @@ import type { PlayerChapter } from "@/lib/player"
 import { FastForward, Pause, Play, RotateCcw, RotateCw, Sun, Volume2 } from "lucide-react-native"
 import React from "react"
 import { Text, View, type ViewStyle } from "react-native"
-import Animated, { type AnimatedStyle, FadeIn, FadeOut, runOnJS, type SharedValue, useAnimatedReaction } from "react-native-reanimated"
+import Animated, { type AnimatedStyle, FadeIn, FadeOut, Keyframe, runOnJS, type SharedValue, useAnimatedReaction } from "react-native-reanimated"
 import { QUIET_HUD_TEXT } from "./constants"
 import { formatTime } from "./helpers"
 
@@ -108,24 +108,43 @@ export function DoubleTapFlash({
     )
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Center-tap play/pause feedback
-///////////////////////////////////////////////////////////////////////////////
+const containerKeyframeIn = new Keyframe({
+    0: {
+        transform: [{ scale: 0.85 }],
+        opacity: 0,
+    },
+    100: {
+        transform: [{ scale: 1 }],
+        opacity: 1,
+    },
+}).duration(100)
+
+const containerKeyframeOut = new Keyframe({
+    0: {
+        transform: [{ scale: 1 }],
+        opacity: 1,
+    },
+    100: {
+        transform: [{ scale: 1.1 }],
+        opacity: 0,
+    },
+}).duration(90)
 
 export function CenterTapFeedback({ feedback }: { feedback: "play" | "pause" }) {
     return (
         <Animated.View
-            entering={FadeIn.duration(100)}
-            exiting={FadeOut.duration(140)}
+            entering={containerKeyframeIn}
+            exiting={containerKeyframeOut}
             pointerEvents="none"
             className="absolute inset-0 items-center justify-center"
+            style={{ zIndex: 999 }}
         >
-            <View className="flex-row items-center justify-center gap-2.5 rounded-full px-3.5 py-2.5">
-                <View className="size-15 items-center justify-center rounded-full bg-white/10">
-                    {feedback === "pause"
-                        ? <Pause size={40} color={QUIET_HUD_TEXT} />
-                        : <Play size={40} color={QUIET_HUD_TEXT} />}
-                </View>
+            <View className="size-16 items-center justify-center rounded-full bg-black/60">
+                {feedback === "pause" ? (
+                    <Pause size={32} color="#ffffff" fill="#ffffff" />
+                ) : (
+                    <Play size={32} color="#ffffff" fill="#ffffff" style={{ marginLeft: 4 }} />
+                )}
             </View>
         </Animated.View>
     )

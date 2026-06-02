@@ -1,13 +1,12 @@
 import type { PlayerChapter, PlayerState as PlayerStateType } from "@/lib/player"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { cn } from "@/lib/utils"
-import { List, Pause, Play, Settings, SkipForward, Unlock, X } from "lucide-react-native"
+import { ChevronLeft, List, Pause, Play, Settings, SkipForward, Unlock } from "lucide-react-native"
 import React from "react"
 import { Platform, Text, View, type ViewStyle } from "react-native"
 import { GestureDetector, Pressable } from "react-native-gesture-handler"
 import type { ComposedGesture, GestureType } from "react-native-gesture-handler"
 import Animated, { type AnimatedStyle, FadeIn, FadeOut, type SharedValue, useAnimatedStyle } from "react-native-reanimated"
-import { BRAND_ACCENT } from "./constants"
 import { formatTime } from "./helpers"
 import type { PlayerPanel } from "./types"
 
@@ -103,6 +102,9 @@ interface ControlsOverlayProps {
     onManualNextEpisode: () => void
     chapters: PlayerChapter[]
     seekBarProgress: SharedValue<number>
+    onLockScreen: () => void
+    onSeekRelative: (delta: number) => void
+    buttonSeekSec: number
 }
 
 function isSkippableChapter(title?: string) {
@@ -121,6 +123,7 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
         onBack, onTogglePlayPause, scheduleHide, clearHideTimer, setPanel,
         canPlayNext, onManualNextEpisode,
         chapters, seekBarProgress,
+        onLockScreen, onSeekRelative, buttonSeekSec,
     } = props
 
     const extendHudPastHorizontalSafeArea = Platform.OS === "ios" && zoomMode === "fill"
@@ -171,7 +174,7 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
             <View pointerEvents="box-none" className="absolute left-0 right-0 top-0">
                 <View className="flex-row items-center pb-2" style={{ paddingTop: insets.top + 4, paddingLeft: topPadL, paddingRight: topPadR }}>
                     <Pressable onPress={onBack} hitSlop={12} className="p-2">
-                        <X size={26} color="#fff" />
+                        <ChevronLeft size={28} color="#fff" />
                     </Pressable>
 
                     <View className="min-w-0 flex-1 shrink pl-3">
@@ -203,27 +206,36 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
                     </View>
 
                     <View className="flex-row items-center gap-1">
-                        {(source?.episodes?.length ?? 0) > 1 && (
-                            <PlayerIconButton
-                                icon={<List size={18} color={panel === "episodes" ? BRAND_ACCENT : "rgba(255,255,255,0.8)"} />}
-                                active={panel === "episodes"}
-                                onPress={() => {
-                                    setPanel(p => p === "episodes" ? null : "episodes")
-                                    clearHideTimer()
-                                }}
-                            />
+                        {!panel && (
+                            <>
+                                {(source?.episodes?.length ?? 0) > 1 && (
+                                    <PlayerIconButton
+                                        icon={<List size={18} color="rgba(255,255,255,0.8)" />}
+                                        onPress={() => {
+                                            setPanel("episodes")
+                                            clearHideTimer()
+                                        }}
+                                    />
+                                )}
+                                <PlayerIconButton
+                                    icon={<Settings size={18} color="rgba(255,255,255,0.8)" />}
+                                    onPress={() => {
+                                        setPanel("main")
+                                        clearHideTimer()
+                                    }}
+                                />
+                            </>
                         )}
-                        <PlayerIconButton
-                            icon={<Settings size={18} color={panel && panel !== "episodes" ? BRAND_ACCENT : "rgba(255,255,255,0.8)"} />}
-                            active={Boolean(panel && panel !== "episodes")}
-                            onPress={() => {
-                                setPanel("main")
-                                clearHideTimer()
-                            }}
-                        />
                     </View>
                 </View>
             </View>
+
+            {/* <View pointerEvents="box-none" className="absolute left-4 top-1/2 -mt-4.5 z-10" style={{ left: Math.max(16, insets.left) }}>
+             <PlayerIconButton
+             icon={<Lock size={18} color="#fff" />}
+             onPress={onLockScreen}
+             />
+             </View> */}
 
             <View pointerEvents="none" className="flex-1" />
 
@@ -316,6 +328,32 @@ export function ControlsOverlay(props: ControlsOverlayProps) {
                                 </View>
                             )}
                         </Pressable>
+
+                        {/* <Pressable
+                         onPress={() => {
+                         onSeekRelative(-buttonSeekSec)
+                         scheduleHide()
+                         }} hitSlop={12}
+                         >
+                         {({ pressed }) => (
+                         <View className={cn("h-10 w-10 items-center justify-center rounded-full", pressed ? "bg-white/15" : "bg-white/10")}>
+                         <RotateCcw size={18} color="#fff" />
+                         </View>
+                         )}
+                         </Pressable>
+
+                         <Pressable
+                         onPress={() => {
+                         onSeekRelative(buttonSeekSec)
+                         scheduleHide()
+                         }} hitSlop={12}
+                         >
+                         {({ pressed }) => (
+                         <View className={cn("h-10 w-10 items-center justify-center rounded-full", pressed ? "bg-white/15" : "bg-white/10")}>
+                         <RotateCw size={18} color="#fff" />
+                         </View>
+                         )}
+                         </Pressable> */}
 
                         <Text className="text-sm font-semibold text-white" style={{ fontVariant: ["tabular-nums"] }}>
                             {formatTime(displayTime)}

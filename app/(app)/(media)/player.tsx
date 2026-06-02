@@ -875,43 +875,6 @@ function PlayerScreenInner() {
                 )}
 
 
-                {isFastForwarding && !isPiPActive && (
-                    <FastForwardBadge speed={prefs.longPressFastForwardSpeed} />
-                )}
-
-                {swipeSeek.swipeSeeking && !isPiPActive && (
-                    <SwipeSeekOverlay
-                        swipeSeeking={swipeSeek.swipeSeeking}
-                        duration={state.duration}
-                        seekingChapter={seekingChapter}
-                    />
-                )}
-
-                {!isPiPActive && (
-                    <DoubleTapFlash
-                        side={doubleTap.doubleTapSide}
-                        amount={doubleTap.doubleTapAmount}
-                        screenWidth={screenWidth}
-                        animatedStyle={doubleTap.doubleTapIndicatorStyle}
-                    />
-                )}
-
-                {centerTapFeedback && !isPiPActive && (
-                    <CenterTapFeedback feedback={centerTapFeedback} />
-                )}
-
-                {sideAdjust.sideAdjustFeedbackKind && !isPiPActive && (
-                    <SideAdjustHUD
-                        kind={sideAdjust.sideAdjustFeedbackKind}
-                        progress={sideAdjust.sideAdjustProgress}
-                        insets={insets}
-                        screenHeight={screenHeight}
-                        padL={padL}
-                        padR={padR}
-                        sideAdjustFillStyle={sideAdjust.sideAdjustFillStyle}
-                    />
-                )}
-
 
                 <GestureDetector gesture={screenGesture}>
                     <Animated.View
@@ -948,6 +911,9 @@ function PlayerScreenInner() {
                         onManualNextEpisode={handleManualNextEpisode}
                         chapters={chapters}
                         seekBarProgress={seekBarProgress}
+                        onLockScreen={controls.lockScreen}
+                        onSeekRelative={player.seekRelative}
+                        buttonSeekSec={prefs.buttonSeekSec}
                     />
                 )}
 
@@ -1014,6 +980,43 @@ function PlayerScreenInner() {
                             )}
                         </Pressable>
                     </Animated.View>
+                )}
+
+                {isFastForwarding && !isPiPActive && (
+                    <FastForwardBadge speed={prefs.longPressFastForwardSpeed} />
+                )}
+
+                {swipeSeek.swipeSeeking && !isPiPActive && (
+                    <SwipeSeekOverlay
+                        swipeSeeking={swipeSeek.swipeSeeking}
+                        duration={state.duration}
+                        seekingChapter={seekingChapter}
+                    />
+                )}
+
+                {!isPiPActive && (
+                    <DoubleTapFlash
+                        side={doubleTap.doubleTapSide}
+                        amount={doubleTap.doubleTapAmount}
+                        screenWidth={screenWidth}
+                        animatedStyle={doubleTap.doubleTapIndicatorStyle}
+                    />
+                )}
+
+                {centerTapFeedback && !isPiPActive && (
+                    <CenterTapFeedback feedback={centerTapFeedback} />
+                )}
+
+                {sideAdjust.sideAdjustFeedbackKind && !isPiPActive && (
+                    <SideAdjustHUD
+                        kind={sideAdjust.sideAdjustFeedbackKind}
+                        progress={sideAdjust.sideAdjustProgress}
+                        insets={insets}
+                        screenHeight={screenHeight}
+                        padL={padL}
+                        padR={padR}
+                        sideAdjustFillStyle={sideAdjust.sideAdjustFillStyle}
+                    />
                 )}
 
                 {panel && !isPiPActive && (

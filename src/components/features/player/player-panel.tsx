@@ -127,16 +127,18 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
     const backPanel = getBackPanel(panel)
 
     return (
-        <View className="absolute inset-0">
+        <View className="absolute inset-0 z-[100]" style={{ zIndex: 100 }}>
             <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
 
             <Animated.View
                 entering={SlideInRight.duration(200)}
                 exiting={SlideOutRight.duration(150)}
-                className="absolute bottom-0 right-0 top-0 border-l border-white/5 bg-black/95"
+                className="absolute bottom-0 right-0 top-0 border-l border-white/5 bg-black/95 z-[100]"
                 style={{
-                    width: 340,
+                    width: 340 + insets.right,
                     paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8,
+                    paddingRight: insets.right,
+                    zIndex: 100,
                 }}
             >
 
