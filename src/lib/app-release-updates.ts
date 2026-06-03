@@ -1,3 +1,4 @@
+import { getStoredString, setStoredString } from "@/atoms/storage"
 import { isManualOfflineModeEnabled } from "@/lib/connection-state"
 import { toast } from "@/lib/utils/toast"
 import Constants from "expo-constants"
@@ -14,6 +15,7 @@ const APP_RELEASE_REPOSITORY = "5rahim/seanime-tenji"
 const APP_RELEASE_URL = `https://github.com/${APP_RELEASE_REPOSITORY}/releases/latest`
 const APP_RELEASE_API_URL = `https://api.github.com/repos/${APP_RELEASE_REPOSITORY}/releases/latest`
 const APP_RELEASE_CHECK_DELAY_MS = 10000
+const DISMISSED_APP_RELEASE_VERSION_KEY = "sea-app-release-dismissed-version"
 
 export function AppReleaseUpdatePrompt() {
     const promptShownRef = React.useRef(false)
@@ -29,6 +31,11 @@ export function AppReleaseUpdatePrompt() {
             void findAvailableAppRelease()
                 .then(release => {
                     if (cancelled || promptShownRef.current || !release) {
+                        return
+                    }
+
+                    const dismissedVersion = getStoredString(DISMISSED_APP_RELEASE_VERSION_KEY)
+                    if (dismissedVersion === release.tagName) {
                         return
                     }
 
@@ -118,7 +125,13 @@ function promptAppReleaseUpdate(release: AppRelease) {
         "App update available",
         `${releaseName} is ready to download.`,
         [
-            { text: "Later", style: "cancel" },
+            {
+                text: "Later",
+                style: "cancel",
+                onPress: () => {
+                    setStoredString(DISMISSED_APP_RELEASE_VERSION_KEY, release.tagName)
+                },
+            },
             {
                 text: "Open",
                 onPress: () => {
