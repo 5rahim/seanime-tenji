@@ -191,13 +191,15 @@ function PlayerScreenInner() {
         playerSeekTo(resumeTarget)
     }, [playerSeekTo, source, state.currentTime, state.paused, state.status, watchHistory])
 
-    const chapters: PlayerChapter[] = state.chapters.length > 0
-        ? state.chapters
-        : (source?.mkvMetadata?.chapters ?? []).map((chapter, index) => ({
-            id: chapter.uid > 0 ? chapter.uid : index,
-            start: chapter.start,
-            title: chapter.text,
-        }))
+    const chapters = React.useMemo<PlayerChapter[]>(() => {
+        return state.chapters.length > 0
+            ? state.chapters
+            : (source?.mkvMetadata?.chapters ?? []).map((chapter, index) => ({
+                id: chapter.uid > 0 ? chapter.uid : index,
+                start: chapter.start,
+                title: chapter.text,
+            }))
+    }, [state.chapters, source?.mkvMetadata?.chapters])
 
     const {
         skipData,
@@ -312,10 +314,10 @@ function PlayerScreenInner() {
         }
     }, [])
 
-    const getSeekTargetFromBarX = (x: number) => {
+    const getSeekTargetFromBarX = React.useCallback((x: number) => {
         const frac = clamp(x / barWidthRef.current, 0, 1)
         return frac * gRef.current.duration
-    }
+    }, [])
 
     const getSeekSnappedTime = React.useCallback((x: number, y: number) => {
         const rawTime = getSeekTargetFromBarX(x)
