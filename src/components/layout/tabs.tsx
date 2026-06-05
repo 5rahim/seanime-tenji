@@ -9,6 +9,7 @@ import * as React from "react"
 import { ComponentProps } from "react"
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native"
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 export type AppTabConfig = {
     show: boolean
@@ -22,8 +23,13 @@ export function TabBar({ state, descriptors, navigation, tabs, user }: BottomTab
     tabs: AppTabConfig[],
     user: Status["user"] | undefined
 }) {
+    const insets = useSafeAreaInsets()
+    const bottomOffset = Platform.OS === "android"
+        ? (insets.bottom > 0 ? insets.bottom + 10 : 10)
+        : 20
+
     return (
-        <View style={styles.tabBar}>
+        <View style={[styles.tabBar, { bottom: bottomOffset }]}>
             {state.routes.map((route, index) => {
                 const { options } = descriptors[route.key]
                 const tab = tabs.find(tab => tab.name === route.name)

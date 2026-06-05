@@ -2,6 +2,7 @@ import { getClientIdentity } from "@/api/client/client-identity"
 import { useUpdateAnimeEntryProgress } from "@/api/hooks/anime_entries.hooks"
 import { useUpdateContinuityWatchHistoryItem } from "@/api/hooks/continuity.hooks"
 import { usePlaybackCancelManualTracking, usePlaybackStartManualTracking } from "@/api/hooks/playback_manager.hooks"
+import { useTorrentstreamStopStream } from "@/api/hooks/torrentstream.hooks"
 import { useIsServerConnected } from "@/lib/offline"
 import { logger } from "@/lib/utils/logger"
 import React from "react"
@@ -11,7 +12,7 @@ import type { MobilePlaybackSource, PlayerState } from "./types"
 const log = logger("continuity-sync")
 
 const CONTINUITY_UPDATE_INTERVAL_MS = 15_000 // every 15s
-const COMPLETION_THRESHOLD = 0.85 // 85% watched = completed
+const COMPLETION_THRESHOLD = 0.80 // 80% watched = completed
 
 export function useContinuitySync(
     source: MobilePlaybackSource | null,
@@ -23,7 +24,28 @@ export function useContinuitySync(
     const { mutate: startManualTracking } = usePlaybackStartManualTracking()
     const { mutate: cancelManualTracking } = usePlaybackCancelManualTracking({})
 
+    const { mutate: stopTorrentStream } = useTorrentstreamStopStream()
+
     const hasSyncedCompletion = React.useRef(false)
+    const hasStoppedStream = React.useRef(false)
+    const latestRatioRef = React.useRef(0)
+    const eofReachedRef = React.useRef(false)
+
+    React.useEffect(() => {
+        if (playerState.duration > 0) {
+            latestRatioRef.current = playerState.currentTime / playerState.duration
+        }
+        eofReachedRef.current = playerState.eofReached
+    }, [playerState.currentTime, playerState.duration, playerState.eofReached])
+
+    const stopPlaybackStream = React.useCallback(() => {
+        if (!source || hasStoppedStream.current) return
+        hasStoppedStream.current = true
+
+        if (source.id.startsWith("torrentstream-")) {
+            stopTorrentStream(undefined)
+        }
+    }, [source, stopTorrentStream])
 
     React.useEffect(() => {
         if (!isConnected || !source || source.serverStreamType || source.mediaId <= 0 || source.episodeNumber <= 0) return
@@ -92,12 +114,16 @@ export function useContinuitySync(
         return () => sub.remove()
     }, [flushContinuity])
 
-    // Flush on unmount
+    // Flush and stop stream on unmount
     React.useEffect(() => {
         return () => {
             flushContinuity()
+            const isCompleted = latestRatioRef.current >= COMPLETION_THRESHOLD || eofReachedRef.current || hasSyncedCompletion.current
+            if (isCompleted) {
+                stopPlaybackStream()
+            }
         }
-    }, [])
+    }, [flushContinuity, stopPlaybackStream])
 
     // Detect completion
     React.useEffect(() => {
@@ -118,9 +144,10 @@ export function useContinuitySync(
         }
     }, [source, playerState.currentTime, playerState.duration, playerState.eofReached, updateAnimeProgress])
 
-    // Reset completion flag when source changes
+    // Reset flags when source changes
     React.useEffect(() => {
         hasSyncedCompletion.current = false
+        hasStoppedStream.current = false
     }, [source?.id])
 
     return {

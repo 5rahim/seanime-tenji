@@ -5,12 +5,12 @@ import { MemoryStatsResponse, Models_HomeItem, Status, Updater_Announcement } fr
 import { toast } from "@/lib/utils/toast"
 import { useQueryClient } from "@tanstack/react-query"
 
-export function useGetStatus() {
+export function useGetStatus(options?: { enabled?: boolean }) {
     return useServerQuery<Status>({
         endpoint: API_ENDPOINTS.STATUS.GetStatus.endpoint,
         method: API_ENDPOINTS.STATUS.GetStatus.methods[0],
         queryKey: [API_ENDPOINTS.STATUS.GetStatus.key],
-        enabled: true,
+        enabled: options?.enabled ?? true,
         retryDelay: 1000,
         // Fixes macOS desktop app startup issue
         retry: 3,

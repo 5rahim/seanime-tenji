@@ -49,7 +49,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
 
     const [manualOffline, setManualOffline] = useManualOfflineMode()
 
-    const { data: _serverStatus, isLoading } = useGetStatus()
+    const { data: _serverStatus, isLoading } = useGetStatus({ enabled: !manualOffline })
 
     React.useEffect(() => {
         if (_serverStatus) {
@@ -62,7 +62,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
     const requiresServerAuth = !!effectiveStatus?.serverHasPassword
     const isUnsupportedServerVersion = !!_serverStatus && !isServerVersionSupported(_serverStatus.version)
     const authVerification = useGetSettings({
-        enabled: requiresServerAuth && !!serverAuthToken,
+        enabled: requiresServerAuth && !!serverAuthToken && !manualOffline,
     })
     const isInvalidServerAuth = authVerification.error?.error === "UNAUTHENTICATED"
 
@@ -104,13 +104,20 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
     }, [setServerUrl])
 
     React.useEffect(() => {
+        if (manualOffline) return
         if (!requiresServerAuth) return
 
         if (!serverAuthToken || isInvalidServerAuth) {
             setServerStatus(null)
             router.replace("/(out)/set-server-url")
         }
-    }, [isInvalidServerAuth, requiresServerAuth, serverAuthToken, setServerStatus])
+    }, [isInvalidServerAuth, requiresServerAuth, serverAuthToken, setServerStatus, manualOffline])
+
+    if (manualOffline) {
+        return <ApiLoaders>
+            {children}
+        </ApiLoaders>
+    }
 
     if (isConnectingOrAuthenticating && showOfflineFallback) {
         return <View className="bg-background flex-1 justify-center items-center gap-6 px-8">
