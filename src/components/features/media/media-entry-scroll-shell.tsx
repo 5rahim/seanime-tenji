@@ -13,6 +13,7 @@ type MediaEntryScrollShellProps = {
     contentContainerStyle?: StyleProp<ViewStyle>
     scrollY?: SharedValue<number>
     showHeaderBackground?: boolean
+    onTitlePress?: () => void
 }
 
 export function MediaEntryScrollShell({
@@ -23,6 +24,7 @@ export function MediaEntryScrollShell({
     contentContainerStyle,
     scrollY: sharedScrollY,
     showHeaderBackground = true,
+    onTitlePress,
 }: MediaEntryScrollShellProps) {
     const localScrollY = useSharedValue(0)
     const scrollY = sharedScrollY ?? localScrollY
@@ -48,7 +50,7 @@ export function MediaEntryScrollShell({
                 onScroll={onScroll}
                 contentContainerStyle={[{ paddingBottom: 110 }, contentContainerStyle]}
             >
-                <MediaEntryHeaderContent entry={entry} type={type} />
+                <MediaEntryHeaderContent entry={entry} type={type} onTitlePress={onTitlePress} />
                 <View style={{ width: "100%", alignSelf: "stretch" }}>
                     {children}
                 </View>

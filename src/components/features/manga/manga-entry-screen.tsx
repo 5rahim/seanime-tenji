@@ -177,7 +177,7 @@ export function MangaEntryScreen({ initialView = "chapters" }: MangaEntryScreenP
                                 contentContainerStyle={{ paddingBottom: 110 }}
                                 nestedScrollEnabled
                             >
-                                <MediaEntryHeaderContent entry={entry} type="manga" />
+                                <MediaEntryHeaderContent entry={entry} type="manga" onTitlePress={() => setCurrentView("info")} />
                                 <OfflineBanner />
                                 {isPrimaryBodyReady ? (
                                     <MangaEntryPrimaryContent
@@ -205,6 +205,7 @@ export function MangaEntryScreen({ initialView = "chapters" }: MangaEntryScreenP
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={infoScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <OfflineBanner />
                             <MangaEntryInfoView mediaId={entry.media.id} fallbackDescription={entry.media.description} />
@@ -220,6 +221,7 @@ export function MangaEntryScreen({ initialView = "chapters" }: MangaEntryScreenP
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={downloadedScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <MangaEntryDownloadedView media={entry.media} />
                         </MediaEntryScrollShell>

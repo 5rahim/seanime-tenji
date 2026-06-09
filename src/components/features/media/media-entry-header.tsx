@@ -8,7 +8,7 @@ import { LinearGradient } from "expo-linear-gradient"
 import { router } from "expo-router"
 import { capitalize } from "lodash"
 import * as React from "react"
-import { InteractionManager, Text, View } from "react-native"
+import { InteractionManager, Pressable, Text, View } from "react-native"
 import Animated, { SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { EditAnilistEntry } from "./edit-anilist-entry"
@@ -213,6 +213,7 @@ export const MediaEntryCloseButton = React.memo(MediaEntryCloseButtonInner)
 type MediaEntryHeaderContentProps = {
     entry: Anime_Entry | Manga_Entry
     type: "anime" | "manga"
+    onTitlePress?: () => void
 }
 
 const ANIME_LIST_STATUS_LABELS: Record<string, string> = {
@@ -229,7 +230,7 @@ const MANGA_LIST_STATUS_LABELS: Record<string, string> = {
     "CURRENT": "Reading",
 }
 
-function MediaEntryHeaderContentInner({ entry, type }: MediaEntryHeaderContentProps) {
+function MediaEntryHeaderContentInner({ entry, type, onTitlePress }: MediaEntryHeaderContentProps) {
     const serverStatus = useServerStatus()
     const coverImageUri = entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge
 
@@ -278,12 +279,14 @@ function MediaEntryHeaderContentInner({ entry, type }: MediaEntryHeaderContentPr
                 </View>
 
                 <View className="flex-1 gap-1.5 pb-1">
-                    <Text
-                        className="text-2xl font-bold leading-6 text-white"
-                        numberOfLines={3}
-                    >
-                        {entry?.media?.title?.userPreferred}
-                    </Text>
+                    <Pressable onPress={onTitlePress} disabled={!onTitlePress} className="active:opacity-75">
+                        <Text
+                            className="text-2xl font-bold leading-6 text-white"
+                            numberOfLines={3}
+                        >
+                            {entry?.media?.title?.userPreferred}
+                        </Text>
+                    </Pressable>
                     {!!alternativeTitle && (
                         <Text className="text-sm leading-tight text-white/40" numberOfLines={2}>
                             {alternativeTitle}

@@ -31,6 +31,7 @@ type AnimeEntryLibraryViewProps = {
     showDeferredContent?: boolean
     scrollY?: SharedValue<number>
     showHeaderBackground?: boolean
+    onTitlePress?: () => void
 }
 
 type EpisodeSection = {
@@ -62,6 +63,7 @@ export function AnimeEntryLibraryView({
     showDeferredContent = true,
     scrollY: sharedScrollY,
     showHeaderBackground = true,
+    onTitlePress,
 }: AnimeEntryLibraryViewProps) {
     const hasEpisodes = mainEpisodes.length > 0 || specialEpisodes.length > 0 || ncEpisodes.length > 0
     const entryKey = entry.media?.id ?? mediaId ?? entry.mediaId
@@ -187,7 +189,7 @@ export function AnimeEntryLibraryView({
 
     const listHeader = React.useMemo(() => (
             <>
-                <MediaEntryHeaderContent entry={entry} type="anime" />
+                <MediaEntryHeaderContent entry={entry} type="anime" onTitlePress={onTitlePress} />
                 <OfflineBanner />
 
                 {isConnected && (
@@ -214,7 +216,7 @@ export function AnimeEntryLibraryView({
             </>
         ),
         [continueWatchingSpoilerActive, entry, entryProgress, isConnected, mediaId, onEpisodePress, unwatchedMainEpisodes, watchHistory,
-            showDeferredContent])
+            showDeferredContent, onTitlePress])
 
     return (
         <View className={showHeaderBackground ? "flex-1 bg-background" : "flex-1 bg-transparent"}>

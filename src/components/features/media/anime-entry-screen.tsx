@@ -283,6 +283,7 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
                             showDeferredContent={isPrimaryBodyReady}
                             scrollY={libraryScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         />
                     </View>
                 )}
@@ -296,6 +297,7 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={torrentstreamScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <OfflineBanner />
                             <AnimeEntryTorrentStreamSection entry={entry} />
@@ -312,6 +314,7 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={onlinestreamScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <OfflineBanner />
                             <AnimeEntryOnlinestreamSection entry={entry} />
@@ -328,6 +331,7 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={infoScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <OfflineBanner />
                             <AnimeEntryInfoView mediaId={entry.media.id} fallbackDescription={entry.media.description} />
@@ -344,6 +348,7 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
                             contentContainerStyle={{ paddingBottom: 180 }}
                             scrollY={downloadedScrollY}
                             showHeaderBackground={false}
+                            onTitlePress={() => setCurrentView("info")}
                         >
                             <OfflineBanner />
                             <AnimeEntryDownloadedView entry={entry} />
