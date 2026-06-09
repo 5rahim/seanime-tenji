@@ -4,15 +4,17 @@ import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { useSetServerUrl } from "@/atoms/server.atoms"
 import { useServerUrl, useSetServerAuthToken, useSetServerStatus } from "@/atoms/server.atoms"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { IMAGES } from "@/constants/images"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
+import { Ionicons } from "@expo/vector-icons"
+import * as Linking from "expo-linking"
 import { router } from "expo-router"
 import * as React from "react"
-import { Image, KeyboardAvoidingView, Text, View } from "react-native"
+import { Image, KeyboardAvoidingView, Pressable, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 export default function Screen() {
@@ -122,9 +124,9 @@ export default function Screen() {
                 </View>
                 <Card className="w-full p-4 rounded-xl bg-background -top-32">
                     <CardHeader className="items-center">
-                        <CardTitle className="pb-2 text-center">Configuration</CardTitle>
+                        {/*<CardTitle className="pb-2 text-center">Configuration</CardTitle>*/}
                         <CardDescription>
-                            <Text>Enter your Seanime server URL and password if this server is protected.</Text>
+                            <Text>Enter your Seanime server URL and password.</Text>
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -173,6 +175,16 @@ export default function Screen() {
                         </Button>
                     </CardFooter>
                 </Card>
+
+                <Pressable
+                    onPress={() => Linking.openURL("https://seanime.app/mobile-server")}
+                    className="mt-4 flex-row items-center justify-center gap-1.5 active:opacity-75"
+                >
+                    <Ionicons name="information-circle-outline" size={16} color="rgba(255,255,255,0.4)" />
+                    <Text className="text-white/40 text-xs font-medium underline">
+                        Run a Seanime Server on this phone
+                    </Text>
+                </Pressable>
             </SafeAreaView>
         </KeyboardAvoidingView>
     )

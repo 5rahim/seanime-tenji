@@ -2,7 +2,7 @@ import { Anime_Entry, Anime_Episode } from "@/api/generated/types"
 import { DownloadEpisodesModal } from "@/components/features/media/download-episodes-modal"
 import { ServerDownloadModal } from "@/components/features/media/server-download-modal"
 import { Button } from "@/components/ui/button"
-import { useCompletedEpisodesForMedia } from "@/lib/downloads"
+import { useCompletedEpisodesForMedia, useIsLocalServer } from "@/lib/downloads"
 import { useIsServerConnected } from "@/lib/offline"
 import { Ionicons } from "@expo/vector-icons"
 import React, { useMemo, useState } from "react"
@@ -23,13 +23,14 @@ export function AnimeEntryActionBar({
     const [serverDownloadModalOpen, setServerDownloadModalOpen] = useState(false)
     const downloadedEpisodes = useCompletedEpisodesForMedia(entry.mediaId)
     const isConnected = useIsServerConnected()
+    const isLocalServer = useIsLocalServer()
 
     const allEpisodes = useMemo(() => {
         return entry.episodes?.filter(ep => ep.localFile?.path) ?? []
     }, [entry.episodes])
 
     const hasDownloads = downloadedEpisodes.length > 0
-    const hasDownloadableEpisodes = allEpisodes.length > 0 && isConnected
+    const hasDownloadableEpisodes = allEpisodes.length > 0 && isConnected && !isLocalServer
 
     return (
         <>
@@ -70,21 +71,21 @@ export function AnimeEntryActionBar({
                     </Button>
                 )}
 
-                {/* {isConnected && (
-                 <Button
-                 variant="secondary"
-                 className="rounded-xl h-11 px-3.5"
-                 style={!nextEpisode && !hasDownloadableEpisodes ? { flex: 1 } : undefined}
-                 onPress={() => setServerDownloadModalOpen(true)}
-                 >
-                 <View className="flex-row items-center gap-2">
-                 <Ionicons name="cloud-download-outline" size={17} color="white" />
-                 <Text className="text-sm font-medium text-secondary-foreground">
-                 Server
-                 </Text>
-                 </View>
-                 </Button>
-                 )} */}
+                {(isConnected && isLocalServer) && (
+                    <Button
+                        variant="secondary"
+                        className="rounded-xl h-11 px-3.5"
+                        style={!nextEpisode && !hasDownloadableEpisodes ? { flex: 1 } : undefined}
+                        onPress={() => setServerDownloadModalOpen(true)}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <Ionicons name="cloud-download-outline" size={17} color="white" />
+                            <Text className="text-sm font-medium text-secondary-foreground">
+                                {(hasDownloadableEpisodes || (nextEpisode && onContinueWatching)) ? "Server" : "Download on Server"}
+                            </Text>
+                        </View>
+                    </Button>
+                )}
             </View>
 
             <DownloadEpisodesModal

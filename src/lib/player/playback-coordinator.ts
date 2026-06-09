@@ -1,5 +1,6 @@
 import type { Anime_Entry, Anime_Episode, Onlinestream_VideoSource } from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
+import { isLocalServer } from "@/lib/downloads"
 import { useIsServerConnected } from "@/lib/offline"
 import { toSourceFromOnlineStream, useStartOnlineStreamPlayback } from "@/lib/player"
 import { currentPlaybackSourceAtom, playerErrorAtom, playerLoadingMessageAtom, playerOpenAtom } from "@/lib/player"
@@ -67,13 +68,16 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
             return
         }
 
+        const isLocal = serverUrl ? isLocalServer(serverUrl) : false
+        const effectiveServerUrl = (isServerConnected || isLocal) ? serverUrl : null
+
         const source = getLocalEpisodePlaybackSource({
             mediaId: entry.media.id,
             episode,
             media: entry.media,
             entryListData: entry.listData ?? undefined,
             episodes: entry.episodes ?? undefined,
-            serverUrl: isServerConnected ? serverUrl : null,
+            serverUrl: effectiveServerUrl,
             entryView: "library",
         })
 

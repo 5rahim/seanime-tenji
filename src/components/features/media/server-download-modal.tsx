@@ -7,6 +7,7 @@ import { useTorrentStreamController } from "@/components/features/torrentstream/
 import { SeaImage } from "@/components/shared/sea-image"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
+import { useIsLocalServer } from "@/lib/downloads"
 import { cn } from "@/lib/utils"
 import { toast } from "@/lib/utils/toast"
 import { Ionicons } from "@expo/vector-icons"
@@ -29,24 +30,43 @@ export function sanitizeDirectoryName(input: string): string {
 }
 
 export function getDefaultDestination(entry: Anime_Entry, libraryPath?: string, os?: string): string {
+    const isWindows = os?.toLowerCase() === "windows"
+    const separator = isWindows ? "\\" : "/"
+
+    let base = ""
     const fPath = entry.localFiles?.find(n => !!n.path)?.path
     if (fPath) {
         const lastSlash = Math.max(fPath.lastIndexOf("/"), fPath.lastIndexOf("\\"))
         if (lastSlash !== -1) {
-            return fPath.substring(0, lastSlash)
+            base = fPath.substring(0, lastSlash)
+        } else {
+            base = fPath
         }
-        return fPath
+    } else if (libraryPath) {
+        base = libraryPath
     }
-    const isWindows = os?.toLowerCase().includes("win")
-    const separator = isWindows ? "\\" : "/"
+
+    if (!base) return ""
+
+    if (!isWindows) {
+        base = base.replace(/\\/g, "/")
+    } else {
+        base = base.replace(/\//g, "\\")
+    }
+
     const folderName = sanitizeDirectoryName(
         entry.media?.title?.romaji || entry.media?.title?.english || entry.media?.title?.userPreferred || "",
     )
-    if (libraryPath) {
-        const hasTrailing = libraryPath.endsWith("/") || libraryPath.endsWith("\\")
-        return hasTrailing ? `${libraryPath}${folderName}` : `${libraryPath}${separator}${folderName}`
+
+    const hasTrailing = base.endsWith("/") || base.endsWith("\\")
+    let result = hasTrailing ? `${base}${folderName}` : `${base}${separator}${folderName}`
+
+    if (!isWindows) {
+        result = result.replace(/\\/g, "/")
+    } else {
+        result = result.replace(/\//g, "\\")
     }
-    return ""
+    return result
 }
 
 function getFileSelectionValue(file: any): string {
@@ -55,8 +75,10 @@ function getFileSelectionValue(file: any): string {
 
 export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloadModalProps) {
     const [page, setPage] = useState(0)
+    const [destination, setDestination] = useState("")
     const serverStatus = useServerStatus()
-    const torrentStream = useTorrentStreamController({ entry })
+    const torrentStream = useTorrentStreamController({ entry, mode: "download" })
+    const isLocalServer = useIsLocalServer()
 
     const { mutate: downloadTorrent, isPending: isDownloadingTorrent } = useTorrentClientDownload(() => {
         torrentStream.setPickerOpen(false)
@@ -71,10 +93,16 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
     const isDownloading = isDownloadingTorrent || isDownloadingDebrid
     const hasTorrentClient = !!serverStatus?.settings?.torrent?.defaultTorrentClient && serverStatus?.settings?.torrent?.defaultTorrentClient !== "none"
 
+    React.useEffect(() => {
+        if (open) {
+            const libraryPath = serverStatus?.settings?.library?.libraryPath
+            setDestination(getDefaultDestination(entry, libraryPath, serverStatus?.os))
+        }
+    }, [open, entry, serverStatus])
+
     const handleDownloadTorrent = useCallback((torrent: HibikeTorrent_AnimeTorrent, smartSelect: boolean = false) => {
         if (!entry.media) return
-        const libraryPath = serverStatus?.settings?.library?.libraryPath
-        const dest = getDefaultDestination(entry, libraryPath, serverStatus?.os)
+            const dest = destination || getDefaultDestination(entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os)
         if (!dest) {
             toast.error("Library path not configured on server")
             return
@@ -97,12 +125,13 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
                 media: entry.media,
             })
         }
-    }, [debridAddTorrents, downloadTorrent, entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os, torrentStream.streamMode])
+        },
+        [debridAddTorrents, downloadTorrent, entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os, torrentStream.streamMode,
+            destination])
 
     const handleDownloadFile = useCallback((torrent: HibikeTorrent_AnimeTorrent, selectedFileId: string | null) => {
             if (!entry.media || !selectedFileId) return
-            const libraryPath = serverStatus?.settings?.library?.libraryPath
-            const dest = getDefaultDestination(entry, libraryPath, serverStatus?.os)
+            const dest = destination || getDefaultDestination(entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os)
             if (!dest) {
                 toast.error("Library path not configured on server")
                 return
@@ -139,17 +168,35 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
             }
         },
         [debridAddTorrents, downloadTorrent, entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os, torrentStream.filePreviews,
-            torrentStream.streamMode])
+            torrentStream.streamMode, destination])
 
     const episodes = useMemo(() => {
-        return torrentStream.episodes.filter(ep => !ep.localFile?.path)
-    }, [torrentStream.episodes])
+        const presentEpisodeKeys = new Set(
+            (entry.episodes ?? [])
+                .filter(ep => ep.localFile?.path)
+                .map(ep => `${ep.type}-${ep.episodeNumber}`),
+        )
+        return torrentStream.episodes.filter(ep => !presentEpisodeKeys.has(`${ep.type}-${ep.episodeNumber}`))
+    }, [torrentStream.episodes, entry.episodes])
     const totalPages = Math.max(1, Math.ceil(episodes.length / MODAL_PAGE_SIZE))
     const pagedEpisodes = episodes.slice(page * MODAL_PAGE_SIZE, (page + 1) * MODAL_PAGE_SIZE)
 
     React.useEffect(() => {
-        if (open) setPage(0)
-    }, [open])
+        if (open) {
+            if (episodes.length > 0) {
+                const progress = entry.listData?.progress ?? 0
+                const nextEpIndex = episodes.findIndex(ep => (ep.progressNumber || ep.episodeNumber) > progress)
+                console.log(entry.listData?.progress, nextEpIndex, episodes)
+                if (nextEpIndex !== -1) {
+                    setPage(Math.floor(nextEpIndex / MODAL_PAGE_SIZE))
+                } else {
+                    setPage(0)
+                }
+            } else {
+                setPage(0)
+            }
+        }
+    }, [open, episodes, entry.listData?.progress])
 
     const handleEpisodePress = useCallback((episode: Anime_Episode) => {
         torrentStream.handleEpisodePress(episode)
@@ -160,12 +207,15 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
             <SeaBottomSheet
                 open={open}
                 onOpenChange={onOpenChange}
-                title="Download to Server"
+                title="Download on Server"
                 snapPoints={["70%", "92%"]}
             >
                 <View className="mb-4">
                     <Text className="text-xs text-white/40 leading-relaxed">
-                        Add anime releases to your server's library. Select an episode below to search and download torrents or debrid files.
+                        {!isLocalServer
+                            ? "Add anime releases to your server's library. Select an episode below to search and download torrents or debrid files."
+                            :
+                            "Select an episode below to search and download torrents. Downloaded episodes will automatically be available for offline playback."}
                     </Text>
                 </View>
 
@@ -275,6 +325,11 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
                 extraProviderIds={torrentStream.extraProviderIds}
                 onSelectExtraProviderIds={torrentStream.setExtraProviderIds}
                 onSelectStage={torrentStream.setSheetStage}
+                availableModes={torrentStream.availableModes}
+                onSelectStreamMode={torrentStream.setStreamMode}
+                destination={destination}
+                onChangeDestination={setDestination}
+                onSelectEpisodeNumber={torrentStream.setSelectedEpisodeNumber}
             />
         </>
     )
@@ -307,7 +362,7 @@ function EpisodeDownloadRow({ episode, watchedProgress, onPress }: EpisodeDownlo
             className="flex-row items-center py-2.5 px-3 rounded-2xl bg-white/[0.03] border border-white/5 mb-2 active:bg-white/10"
         >
             <View
-                className="rounded-lg overflow-hidden bg-white/5"
+                className={cn("rounded-lg overflow-hidden bg-white/5", isWatched && "opacity-45")}
                 style={{ width: thumbnailWidth, aspectRatio: 16 / 9 }}
             >
                 <SeaImage
@@ -334,7 +389,7 @@ function EpisodeDownloadRow({ episode, watchedProgress, onPress }: EpisodeDownlo
                     </Text>
                 )}
                 {isWatched && (
-                    <Text className="text-[10px] text-muted-foreground/60 mt-0.5 font-medium">
+                    <Text className="text-[10px] text-muted-foreground/60 mt-0.5 font-bold">
                         Watched
                     </Text>
                 )}
@@ -344,13 +399,8 @@ function EpisodeDownloadRow({ episode, watchedProgress, onPress }: EpisodeDownlo
                 {isOnServer ? (
                     <View className="flex-row items-center gap-1 bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-md">
                         <Ionicons name="checkmark" size={10} color="#4ade80" />
-                        <Text className="text-[10px] font-semibold text-green-400">On Server</Text>
                     </View>
-                ) : (
-                    <View className="bg-white/5 border border-white/10 p-1.5 rounded-full">
-                        <Ionicons name="cloud-download-outline" size={15} color="white" />
-                    </View>
-                )}
+                ) : null}
             </View>
         </Pressable>
     )

@@ -31,6 +31,8 @@ export {
     resumeStalledAnimeDownloads,
     retryAnimeDownload,
     retryFailedAnimeDownloads,
+    isLocalServer,
+    syncLocalServerFilesToDownloads,
 } from "./download-manager"
 
 export {
@@ -56,6 +58,8 @@ export {
     useResumeAllAnimeDownloads,
     useRetryAnimeDownload,
     useRetryAllFailedAnimeDownloads,
+    useIsLocalServer,
+    useDownloadedEpisodeCount,
 } from "./use-downloads"
 
 ////////////////////////// Manga chapter downloads

@@ -277,6 +277,9 @@ export function AnimeEntryTorrentStreamSection({ entry }: AnimeEntryTorrentStrea
                 extraProviderIds={torrentStream.extraProviderIds}
                 onSelectExtraProviderIds={torrentStream.setExtraProviderIds}
                 onSelectStage={torrentStream.setSheetStage}
+                availableModes={torrentStream.availableModes}
+                onSelectStreamMode={torrentStream.setStreamMode}
+                onSelectEpisodeNumber={torrentStream.setSelectedEpisodeNumber}
             />
         </>
     )

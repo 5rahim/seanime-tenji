@@ -16,6 +16,7 @@ import {
     useAnimeTotalDownloadSize,
     useFailedAnimeDownloads,
     useFailedMangaDownloads,
+    useIsLocalServer,
     useMangaDownloadDiskUsage,
 } from "@/lib/downloads"
 import { useIsServerConnected, useManualOfflineMode, useServerConnectionState } from "@/lib/offline"
@@ -40,6 +41,7 @@ export default function ProfileScreen() {
     const [manualOffline, setManualOffline] = useManualOfflineMode()
     const activeStream = useAtomValue(activeStreamSessionAtom)
     const isServerConnected = useIsServerConnected()
+    const isLocalServer = useIsLocalServer()
 
     const socket = useAtomValue(websocketAtom)
     const [scanProgress, setScanProgress] = React.useState<number | null>(null)
@@ -318,25 +320,32 @@ export default function ProfileScreen() {
                         />
                     </ProfileMenuSection>
 
-                    {/* {isServerConnected && (
-                     <ProfileMenuSection title="Server Downloads">
-                     <ProfileMenuItem
-                     icon="cloud-download-outline"
-                     label="Server Download Queue"
-                     detail="Monitor active torrent/debrid client downloads on the server"
-                     onPress={() => router.push("/(app)/(tabs)/(profile)/server-downloads" as never)}
-                     />
-                     <RowDivider />
-                     <ProfileMenuItem
-                     icon={isScanning ? "refresh" : "refresh-outline"}
-                     label={isScanning ? (scanStatus || "Scanning library...") : "Rescan Library"}
-                     detail={isScanning ? `Progress: ${scanProgress ?? 0}%` : "Force local filesystem scan"}
-                     accessory={isScanning ? <ActivityIndicator size="small" color="rgba(255,255,255,0.45)" /> : undefined}
-                     onPress={handleRescan}
-                     hideChevron={isScanning}
-                     />
-                     </ProfileMenuSection>
-                     )} */}
+                    {(isServerConnected && isLocalServer) && (
+                        <ProfileMenuSection title="Server Library">
+                            <ProfileMenuItem
+                                icon="cloud-download-outline"
+                                label="Server Download Queue"
+                                detail="Monitor active downloads running on the server"
+                                onPress={() => router.push("/(app)/(tabs)/(profile)/server-downloads" as never)}
+                            />
+                            <RowDivider />
+                            <ProfileMenuItem
+                                icon="alert-circle-outline"
+                                label="Resolve Unmatched"
+                                detail="Manually match unmatched files/folders to anime entries"
+                                onPress={() => router.push("/(app)/(tabs)/(profile)/unmatched" as never)}
+                            />
+                            <RowDivider />
+                            <ProfileMenuItem
+                                icon={isScanning ? "refresh" : "search-circle-outline"}
+                                label={isScanning ? (scanStatus || "Scanning library...") : "Rescan Library"}
+                                detail={isScanning ? `Progress: ${scanProgress ?? 0}%` : "Scan files in your host library"}
+                                accessory={isScanning ? <ActivityIndicator size="small" color="rgba(255,255,255,0.45)" /> : undefined}
+                                onPress={handleRescan}
+                                hideChevron={isScanning}
+                            />
+                        </ProfileMenuSection>
+                    )}
 
                     <ProfileMenuSection title="App">
                         <ProfileMenuToggle
@@ -362,31 +371,31 @@ export default function ProfileScreen() {
                             onPress={() => router.push("/(app)/(tabs)/(profile)/logs" as never)}
                         />
                         <RowDivider />
-                        <ProfileMenuItem
-                            icon="phone-portrait-outline"
-                            label="App Version"
-                            detail={`v${otaVersionInfo.appVersion}`}
-                            hideChevron
-                        />
+                        {/*<ProfileMenuItem*/}
+                        {/*    icon="phone-portrait-outline"*/}
+                        {/*    label="App Version"*/}
+                        {/*    detail={`v${otaVersionInfo.appVersion}`}*/}
+                        {/*    hideChevron*/}
+                        {/*/>*/}
                         <RowDivider />
                         <ProfileMenuItem
-                            icon="download-outline"
-                            label="Check App Update"
+                            icon="reload-circle-outline"
+                            label="Check New Release"
                             detail={isCheckingAppReleaseUpdate ? "Checking releases" : undefined}
                             accessory={isCheckingAppReleaseUpdate ? <ActivityIndicator size="small" color="rgba(255,255,255,0.45)" /> : undefined}
                             onPress={handleCheckForAppReleaseUpdatePress}
                             hideChevron
                         />
                         <RowDivider />
-                        <ProfileMenuItem
-                            icon="cloud-download-outline"
-                            label="OTA Version"
-                            detail={`${otaVersionInfo.otaVersion} · ${otaVersionInfo.detail}`}
-                            hideChevron
-                        />
+                        {/*<ProfileMenuItem*/}
+                        {/*    icon="cloud-download-outline"*/}
+                        {/*    label="OTA Version"*/}
+                        {/*    detail={`${otaVersionInfo.otaVersion} · ${otaVersionInfo.detail}`}*/}
+                        {/*    hideChevron*/}
+                        {/*/>*/}
                         <RowDivider />
                         <ProfileMenuItem
-                            icon="refresh-outline"
+                            icon="code-download-outline"
                             label="Check OTA Update"
                             detail={isCheckingOtaUpdate ? "Checking update server" : undefined}
                             accessory={isCheckingOtaUpdate ? <ActivityIndicator size="small" color="rgba(255,255,255,0.45)" /> : undefined}
@@ -416,6 +425,10 @@ export default function ProfileScreen() {
                     open={playerPickerOpen}
                     onOpenChange={handlePlayerPickerClose}
                 />
+
+                <View className="mx-5 pt-4">
+                    <Text className="text-muted-foreground text-sm text-right">{`v${otaVersionInfo.appVersion}`} | {`${otaVersionInfo.otaVersion}`}</Text>
+                </View>
             </ScrollView>
         </SafeView>
     )

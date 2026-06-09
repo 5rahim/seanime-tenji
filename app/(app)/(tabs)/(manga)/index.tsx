@@ -6,6 +6,7 @@ import { MediaEntryGrid } from "@/components/features/media/media-entry-grid"
 import { TabFadeView } from "@/components/layout/tab-fade-view"
 import { CenteredSpinner } from "@/components/shared/centered-spinner"
 import { LIBRARY_SEARCH_HEADER_BASE_HEIGHT, LibrarySearchHeader } from "@/components/shared/library-search-header"
+import { LuffyError } from "@/components/shared/luffy-error"
 import { OfflineBanner } from "@/components/shared/offline-banner"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { useMangaLibraryCollection } from "@/hooks/use-manga-library-collection"
@@ -166,6 +167,12 @@ export default function MangaLibraryScreen() {
                                 ) : null
                             }
                             ListFooterComponent={<DownloadedMangaList />}
+                            ListEmptyComponent={isConnected && currentlyReadingEntries.length === 0 ? (
+                                <LuffyError
+                                    title="Your manga library is empty"
+                                    description="Add manga to your collection or use the Discover tab to find something to read."
+                                />
+                            ) : null}
                             contentInsetAdjustmentBehavior="never"
                             contentContainerStyle={{
                                 paddingTop: hasHero ? 0 : searchHeaderHeight,

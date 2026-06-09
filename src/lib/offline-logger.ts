@@ -32,7 +32,9 @@ type GlobalWithErrorHooks = typeof globalThis & {
 
 const OFFLINE_LOGS_STORAGE_KEY = "sea-offline-log-entries"
 const OFFLINE_LOGGING_ENABLED_STORAGE_KEY = "sea-offline-logging-enabled"
-const MAX_OFFLINE_LOG_ENTRIES = 500
+const MAX_OFFLINE_LOG_ENTRIES = 200
+const MAX_DATA_ITEMS_PER_ENTRY = 5
+const MAX_DATA_ITEM_LENGTH = 500
 
 const originalConsole = {
     debug: console.debug.bind(console),
@@ -114,7 +116,9 @@ function sanitizeEntryForExport(entry: OfflineLogEntry): OfflineLogEntry {
 }
 
 function createOfflineLogEntry(level: OfflineLogLevel, scope: string, data: unknown[], native = false): OfflineLogEntry {
-    const normalizedData = data.map(item => stringifyValue(item))
+    const normalizedData = data
+        .slice(0, MAX_DATA_ITEMS_PER_ENTRY)
+        .map(item => stringifyValue(item).slice(0, MAX_DATA_ITEM_LENGTH))
     const timestamp = new Date().toISOString()
 
     return {
@@ -122,7 +126,7 @@ function createOfflineLogEntry(level: OfflineLogLevel, scope: string, data: unkn
         timestamp,
         level,
         scope,
-        message: normalizedData.join(" ").slice(0, 1200),
+        message: normalizedData.join(" ").slice(0, 800),
         data: normalizedData,
         platform: Platform.OS,
         native,
@@ -130,14 +134,29 @@ function createOfflineLogEntry(level: OfflineLogLevel, scope: string, data: unkn
 }
 
 function persistEntry(entry: OfflineLogEntry) {
-    const entries = getStoredJsonValue<OfflineLogEntry[]>(OFFLINE_LOGS_STORAGE_KEY) ?? []
-    entries.push(entry)
+    try {
+        const entries = getStoredJsonValue<OfflineLogEntry[]>(OFFLINE_LOGS_STORAGE_KEY) ?? []
+        entries.push(entry)
 
-    const nextEntries = entries.length > MAX_OFFLINE_LOG_ENTRIES
-        ? entries.slice(entries.length - MAX_OFFLINE_LOG_ENTRIES)
-        : entries
+        let nextEntries = entries.length > MAX_OFFLINE_LOG_ENTRIES
+            ? entries.slice(entries.length - MAX_OFFLINE_LOG_ENTRIES)
+            : entries
 
-    setStoredString(OFFLINE_LOGS_STORAGE_KEY, JSON.stringify(nextEntries))
+        try {
+            setStoredString(OFFLINE_LOGS_STORAGE_KEY, JSON.stringify(nextEntries))
+        }
+        catch {
+            nextEntries = nextEntries.slice(-50)
+            try {
+                setStoredString(OFFLINE_LOGS_STORAGE_KEY, JSON.stringify(nextEntries))
+            }
+            catch {
+                removeStoredKey(OFFLINE_LOGS_STORAGE_KEY)
+            }
+        }
+    }
+    catch {
+    }
 }
 
 export function appendOfflineLog(level: OfflineLogLevel, scope: string, data: unknown[], native = false): OfflineLogEntry {

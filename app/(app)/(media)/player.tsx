@@ -18,6 +18,7 @@ import { CenterTapFeedback, DoubleTapFlash, FastForwardBadge, SideAdjustHUD, Swi
 import { PlayerPanelOverlay } from "@/components/features/player/player-panel"
 import type { PlayerPanel } from "@/components/features/player/types"
 import { createGestureRefs, syncGestureRef } from "@/components/features/player/types"
+import { isLocalServer } from "@/lib/downloads"
 import { useIsServerConnected } from "@/lib/offline"
 import {
     currentPlaybackSourceAtom,
@@ -230,13 +231,16 @@ function PlayerScreenInner() {
     const nextLocalPlaybackSource = React.useMemo(() => {
         if (!source || source.nextEpisodeAction !== "local-file" || !nextEpisode) return null
 
+        const isLocal = serverUrl ? isLocalServer(serverUrl) : false
+        const effectiveServerUrl = (isServerConnected || isLocal) ? serverUrl : null
+
         return getLocalEpisodePlaybackSource({
             mediaId: source.mediaId,
             episode: nextEpisode,
             media: source.media,
             entryListData: source.entryListData,
             episodes: source.episodes,
-            serverUrl: isServerConnected ? serverUrl : null,
+            serverUrl: effectiveServerUrl,
             entryView: source.entryView ?? "library",
         })
     }, [isServerConnected, nextEpisode, serverUrl, source])

@@ -30,7 +30,7 @@ export function getLocalEpisodePlaybackSource(
     const episodeId = getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber, episode.localFile?.path)
     const downloaded = getDownloadedEpisode(mediaId, episodeId)
 
-    if (downloaded?.status === "completed" && downloaded.localFilePath) {
+    if (downloaded?.status === "completed" && downloaded.localFilePath && !downloaded.isLocalServerFile) {
         return {
             id: `downloaded-${Date.now()}`,
             streamKind: "file",

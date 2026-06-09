@@ -10,10 +10,13 @@ import {
 } from "@/api/generated/types"
 import { LabeledSwitch } from "@/components/shared/labeled-switch"
 import { NativeSelect, type NativeSelectOption } from "@/components/shared/native-select"
+import { SegmentedControl } from "@/components/shared/segmented-control"
 import { SheetFooter, SheetFooterButton } from "@/components/shared/sheet-footer"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { FormSectionLabel } from "@/components/ui/form-field"
+import { copyOfflineLogTextToClipboard } from "@/lib/offline-logger"
 import { cn } from "@/lib/utils"
+import { toast } from "@/lib/utils/toast"
 import { Ionicons } from "@expo/vector-icons"
 import { BottomSheetTextInput } from "@gorhom/bottom-sheet"
 import * as React from "react"
@@ -74,6 +77,11 @@ type TorrentStreamPickerSheetProps = {
     extraProviderIds: string[]
     onSelectExtraProviderIds: (ids: string[]) => void
     onSelectStage: (stage: TorrentSheetStage) => void
+    availableModes: StreamMode[]
+    onSelectStreamMode: (mode: StreamMode) => void
+    destination?: string
+    onChangeDestination?: (path: string) => void
+    onSelectEpisodeNumber?: (episodeNumber: number) => void
 }
 
 export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
@@ -130,6 +138,11 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         extraProviderIds,
         onSelectExtraProviderIds,
         onSelectStage,
+        availableModes,
+        onSelectStreamMode,
+        destination,
+        onChangeDestination,
+        onSelectEpisodeNumber,
     } = props
 
     const primaryLabel = React.useMemo(() => {
@@ -149,6 +162,22 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
 
             return (
                 <SheetFooter className="flex-col gap-2">
+                    {destination !== undefined && onChangeDestination && (
+                        <View className="w-full gap-1 px-1 mb-1">
+                            <Text className="text-[10px] font-semibold text-white/35 uppercase tracking-wider">Destination Path</Text>
+                            <View className="h-10 flex-row items-center rounded-xl border border-white/10 bg-white/5 px-3">
+                                <BottomSheetTextInput
+                                    value={destination}
+                                    onChangeText={onChangeDestination}
+                                    placeholder="Destination directory"
+                                    placeholderTextColor="rgba(255,255,255,0.35)"
+                                    className="flex-1 py-0 text-xs text-foreground"
+                                    autoCorrect={false}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                        </View>
+                    )}
                     {pickerStage === "torrents" && selectedTorrent?.isBatch && !hasDebrid && (
                         <View className="flex-row gap-3 w-full">
                             <SheetFooterButton
@@ -266,6 +295,8 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         onConfirmFileSelection,
         selectedEpisode,
         primaryLabel,
+        destination,
+        onChangeDestination,
     ])
 
     return (
@@ -279,7 +310,7 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         >
             <View className="gap-4">
                 <View className="gap-1.5">
-                    <Text className="text-md font-medium text-muted-foreground">
+                    <Text className="text-sm font-medium text-muted-foreground">
                         {selectedEpisode?.episodeTitle || selectedEpisode?.displayTitle || (streamMode === "debrid"
                             ? "Choose a release"
                             : "Choose a torrent")}
@@ -322,6 +353,12 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                         extraProviderIds={extraProviderIds}
                         onSelectExtraProviderIds={onSelectExtraProviderIds}
                         onSelectStage={onSelectStage}
+                        availableModes={availableModes}
+                        onSelectStreamMode={onSelectStreamMode}
+                        streamMode={streamMode}
+                        selectedEpisode={selectedEpisode}
+                        onSelectEpisodeNumber={onSelectEpisodeNumber}
+                        mode={mode}
                     />
                 ) : pickerStage === "providers" ? (
                     <TorrentProviderSelectionStage
@@ -381,9 +418,16 @@ type TorrentSelectionStageProps = {
     extraProviderIds: string[]
     onSelectExtraProviderIds: (ids: string[]) => void
     onSelectStage: (stage: TorrentSheetStage) => void
+    availableModes: StreamMode[]
+    onSelectStreamMode: (mode: StreamMode) => void
+    streamMode: StreamMode
+    selectedEpisode: Anime_Episode | null
+    onSelectEpisodeNumber?: (episodeNumber: number) => void
+    mode?: "stream" | "download"
 }
 
 function TorrentSelectionStage(props: TorrentSelectionStageProps) {
+    const [isFiltersExpanded, setIsFiltersExpanded] = React.useState(false)
     const {
         batchHistory,
         batchHistoryMetadata,
@@ -419,6 +463,12 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
         extraProviderIds,
         onSelectExtraProviderIds,
         onSelectStage,
+        availableModes,
+        onSelectStreamMode,
+        streamMode,
+        selectedEpisode,
+        onSelectEpisodeNumber,
+        mode,
     } = props
 
     const providerOptions = React.useMemo(
@@ -459,129 +509,201 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
         })
     }, [episodes, onSelectTorrent, selectedTorrent?.downloadUrl, selectedTorrent?.infoHash, torrentMetadataByInfoHash, torrents])
 
+    const segmentedOptions = React.useMemo(() => [
+        { value: "torrent", label: "Torrent Client" },
+        { value: "debrid", label: "Debrid Service" },
+    ].filter(opt => availableModes?.includes(opt.value as StreamMode)), [availableModes])
+
+    const nativeEpisodeOptions = React.useMemo<NativeSelectOption[]>(
+        () => episodes.map(ep => ({
+            id: String(ep.episodeNumber),
+            label: `Episode ${ep.episodeNumber}`,
+            sublabel: ep.episodeTitle || ep.displayTitle || undefined,
+        })),
+        [episodes],
+    )
+
+    const activeFilterCount = React.useMemo(() => {
+        let count = 0
+        if (searchAcrossProviders) count++
+        if (searchMode === "smart" && supportsSmartSearch) {
+            if (smartSearchBatch && smartSearchFilters.includes("batch")) count++
+            if (resolution !== undefined && smartSearchFilters.includes("resolution")) count++
+            if (bestRelease && smartSearchFilters.includes("bestReleases")) count++
+        }
+        return count
+    }, [searchAcrossProviders, searchMode, supportsSmartSearch, smartSearchBatch, smartSearchFilters, resolution, bestRelease])
+
     return (
         <View className="gap-4">
+            {mode === "download" && availableModes && availableModes.length > 1 && (
+                <SegmentedControl
+                    options={segmentedOptions}
+                    value={streamMode}
+                    onChange={(val) => onSelectStreamMode(val as StreamMode)}
+                />
+            )}
             {episodeCollectionHasMappingError && (
                 <SurfaceMessage text="AniDB mapping is missing for this title. Manual torrent and file selection may be required." tone="warning" />
             )}
 
-            {/* {canUsePreviousBatch && (
-             <Surface variant="muted" className="p-3.5 gap-3.5">
-             <FormSectionLabel>Batch</FormSectionLabel>
-             <LabeledSwitch
-             label="Reuse previous batch"
-             checked={usePreviousBatch}
-             onToggle={onToggleUsePreviousBatch}
-             helper={batchHistory?.torrent?.name || "Reuse your last selected batch torrent."}
-             />
-             </Surface>
-             )} */}
-
-            {/* <Surface variant="muted" className="p-3.5 gap-3.5"> */}
-            <FormSectionLabel>Provider</FormSectionLabel>
-
-            {providerOptions.length === 0 ? (
-                <SurfaceMessage text="No anime torrent provider extensions are installed." tone="muted" />
-            ) : (
-                <NativeSelect
-                    options={nativeProviderOptions}
-                    selectedId={selectedProviderId}
-                    onSelect={onSelectProvider}
-                    title="Select Provider"
-                />
-            )}
-
-            {selectedProviderId !== NONE_PROVIDER && providerOptions.length > 1 && (
-                <View className="gap-2.5">
-                    <LabeledSwitch
-                        label="Search across providers"
-                        checked={searchAcrossProviders}
-                        onToggle={onToggleSearchAcrossProviders}
-                        helper="Runs the same search against other installed providers."
-                    />
-                    {searchAcrossProviders && (
-                        <Pressable
-                            onPress={() => onSelectStage("providers")}
-                            className="flex-row items-center justify-between h-11 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] active:bg-white/5 mt-0.5"
-                        >
-                            <Text className="text-sm font-medium text-white">
-                                {extraProviderIds.filter(id => id !== selectedProviderId).length === 0
-                                    ? "Select providers..."
-                                    : `${extraProviderIds.filter(id => id !== selectedProviderId).length} selected`}
-                            </Text>
-                            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.45)" />
-                        </Pressable>
+            <View className="gap-3.5">
+                <View className="gap-1.5">
+                    <FormSectionLabel>Provider</FormSectionLabel>
+                    {providerOptions.length === 0 ? (
+                        <SurfaceMessage text="No provider extensions" tone="muted" />
+                    ) : (
+                        <NativeSelect
+                            options={nativeProviderOptions}
+                            selectedId={selectedProviderId}
+                            onSelect={onSelectProvider}
+                            title="Select Provider"
+                        />
                     )}
+                </View>
+
+                {selectedProviderId !== NONE_PROVIDER && (
+                    <LabeledSwitch
+                        label="Smart search"
+                        checked={searchMode === "smart"}
+                        onToggle={() => onSelectSearchMode(searchMode === "smart" ? "simple" : "smart")}
+                        disabled={!supportsSmartSearch}
+                        helper={supportsSmartSearch ? "Automated search based on given parameters." : "This provider does not support smart search."}
+                    />
+                )}
+
+                {selectedProviderId !== NONE_PROVIDER && searchMode === "smart" && mode !== "stream" && supportsSmartSearch && smartSearchFilters.includes(
+                    "episodeNumber") && onSelectEpisodeNumber && episodes.length > 0 && (
+                    <View className="gap-1.5">
+                        <FormSectionLabel>Episode</FormSectionLabel>
+                        <NativeSelect
+                            options={nativeEpisodeOptions}
+                            selectedId={selectedEpisode ? String(selectedEpisode.episodeNumber) : ""}
+                            onSelect={(id) => onSelectEpisodeNumber?.(Number(id))}
+                            title="Select Episode"
+                        />
+                    </View>
+                )}
+            </View>
+
+            {selectedProviderId !== NONE_PROVIDER && (searchMode === "simple") && (
+                <View className="gap-2">
+                    <Text className="text-xs text-white/35">Search query</Text>
+                    <TorrentSearchQueryField
+                        value={searchQuery}
+                        onChangeText={onUpdateSearchQuery}
+                    />
                 </View>
             )}
 
             {selectedProviderId !== NONE_PROVIDER && (
-                <>
-                    {supportsSmartSearch && (
-                        <LabeledSwitch
-                            label="Smart search"
-                            checked={searchMode === "smart"}
-                            onToggle={() => onSelectSearchMode(searchMode === "smart" ? "simple" : "smart")}
-                            helper="Automatically filters by episode number, resolution, and batch type."
-                        />
-                    )}
-
-                    {(searchMode === "simple" || smartSearchFilters.includes("query")) && (
-                        <View className="gap-2">
-                            <Text className="text-xs text-white/35">Search query</Text>
-                            <TorrentSearchQueryField
-                                value={searchQuery}
-                                onChangeText={onUpdateSearchQuery}
+                <View className="gap-3">
+                    <Pressable
+                        onPress={() => setIsFiltersExpanded(!isFiltersExpanded)}
+                        className="flex-row items-center justify-between py-1.5 px-0.5 border-b border-white/5 active:opacity-60"
+                    >
+                        <Text className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+                            Search Settings
+                        </Text>
+                        <View className="flex-row items-center gap-2">
+                            {activeFilterCount > 0 && (
+                                <View className="bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                                    <Text className="text-[10px] font-semibold text-indigo-400">
+                                        {activeFilterCount} active
+                                    </Text>
+                                </View>
+                            )}
+                            <Ionicons
+                                name={isFiltersExpanded ? "chevron-up" : "chevron-down"}
+                                size={14}
+                                color="rgba(255,255,255,0.4)"
                             />
                         </View>
-                    )}
+                    </Pressable>
 
-                    {searchMode === "smart" && (
-                        <View className="gap-3">
-                            {smartSearchFilters.includes("batch") && (
-                                <LabeledSwitch
-                                    label="Search batches"
-                                    checked={smartSearchBatch}
-                                    onToggle={onToggleSmartBatch}
-                                    helper="Prefer finished-season batch releases when available."
-                                />
-                            )}
-
-                            {smartSearchFilters.includes("resolution") && (
-                                <View className="gap-2">
-                                    <Text className="text-xs text-white/35">Resolution</Text>
-                                    <ChipWrap>
-                                        <ChoiceChip
-                                            key="any"
-                                            label="Any"
-                                            active={resolution === undefined}
-                                            onPress={() => onSelectResolution(undefined)}
-                                        />
-                                        {TORRENT_RESOLUTIONS.map(item => (
-                                            <ChoiceChip
-                                                key={item}
-                                                label={item}
-                                                active={resolution === item}
-                                                onPress={() => onSelectResolution(resolution === item ? undefined : item)}
-                                            />
-                                        ))}
-                                    </ChipWrap>
+                    {isFiltersExpanded && (
+                        <View className="gap-3.5 bg-white/[0.02] border border-white/5 rounded-2xl p-3.5">
+                            {providerOptions.length > 1 && (
+                                <View className="gap-2.5">
+                                    <LabeledSwitch
+                                        label="Search across providers"
+                                        checked={searchAcrossProviders}
+                                        onToggle={onToggleSearchAcrossProviders}
+                                        helper="Runs the same search against other installed providers."
+                                    />
+                                    {searchAcrossProviders && (
+                                        <Pressable
+                                            onPress={() => onSelectStage("providers")}
+                                            className="flex-row items-center justify-between h-11 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] active:bg-white/5 mt-0.5"
+                                        >
+                                            <Text className="text-sm font-medium text-white">
+                                                {extraProviderIds.filter(id => id !== selectedProviderId).length === 0
+                                                    ? "Select providers..."
+                                                    : `${extraProviderIds.filter(id => id !== selectedProviderId).length} selected`}
+                                            </Text>
+                                            <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.45)" />
+                                        </Pressable>
+                                    )}
                                 </View>
                             )}
 
-                            {smartSearchFilters.includes("bestReleases") && (
-                                <LabeledSwitch
-                                    label="Best releases"
-                                    checked={bestRelease}
-                                    onToggle={onToggleBestRelease}
-                                    helper="Prefer best-ranked releases when the provider supports it."
-                                />
+                            {(smartSearchFilters.includes("query")) && (
+                                <View className="gap-2">
+                                    <Text className="text-xs text-white/35">Search query</Text>
+                                    <TorrentSearchQueryField
+                                        value={searchQuery}
+                                        onChangeText={onUpdateSearchQuery}
+                                    />
+                                </View>
+                            )}
+
+                            {searchMode === "smart" && (
+                                <View className="gap-3.5">
+                                    {smartSearchFilters.includes("batch") && (
+                                        <LabeledSwitch
+                                            label="Search batches"
+                                            checked={smartSearchBatch}
+                                            onToggle={onToggleSmartBatch}
+                                            helper="Prefer finished-season batch releases when available."
+                                        />
+                                    )}
+
+                                    {smartSearchFilters.includes("resolution") && (
+                                        <View className="gap-2">
+                                            <Text className="text-xs text-white/35">Resolution</Text>
+                                            <ChipWrap>
+                                                <ChoiceChip
+                                                    key="any"
+                                                    label="Any"
+                                                    active={resolution === undefined || (resolution as any) === ""}
+                                                    onPress={() => onSelectResolution(undefined)}
+                                                />
+                                                {TORRENT_RESOLUTIONS.map(item => (
+                                                    <ChoiceChip
+                                                        key={item}
+                                                        label={item + "p"}
+                                                        active={resolution === item}
+                                                        onPress={() => onSelectResolution(resolution === item ? undefined : item)}
+                                                    />
+                                                ))}
+                                            </ChipWrap>
+                                        </View>
+                                    )}
+
+                                    {smartSearchFilters.includes("bestReleases") && (
+                                        <LabeledSwitch
+                                            label="Best releases"
+                                            checked={bestRelease}
+                                            onToggle={onToggleBestRelease}
+                                            helper="Prefer best-ranked releases when the provider supports it."
+                                        />
+                                    )}
+                                </View>
                             )}
                         </View>
                     )}
-                </>
+                </View>
             )}
-            {/* </Surface> */}
 
             {!!batchHistory?.torrent && (
                 <View className="gap-2">
@@ -1227,6 +1349,23 @@ function TorrentCard({
                                 <Ionicons name="server-outline" size={11} color="rgba(255,255,255,0.28)" />
                                 <Text className="text-xs text-white/32">{formatProviderName(torrent.provider)}</Text>
                             </View>
+                        )}
+
+                        {(!!torrent.magnetLink || !!torrent.downloadUrl || !!torrent.link) && (
+                            <Pressable
+                                onPress={(e) => {
+                                    e.stopPropagation()
+                                    const copyUrl = torrent.magnetLink || torrent.downloadUrl || torrent.link
+                                    if (copyUrl) {
+                                        copyOfflineLogTextToClipboard(copyUrl)
+                                        toast.success("Link copied to clipboard")
+                                    }
+                                }}
+                                className="ml-auto p-1.5 bg-white/5 border border-white/10 rounded-lg active:bg-white/10"
+                                hitSlop={8}
+                            >
+                                <Ionicons name="copy-outline" size={12} color="rgba(255,255,255,0.5)" />
+                            </Pressable>
                         )}
                     </View>
 

@@ -21,16 +21,32 @@ export default function ServerDownloadsScreen() {
 
     useIOSScrollRefreshRateWorkaround()
 
-    const { data: torrents, isLoading: isLoadingTorrents } = useGetActiveTorrentList(
+    const { data: rawTorrents, isLoading: isLoadingTorrents } = useGetActiveTorrentList(
         isConnected && activeTab === "torrent",
         "",
         "",
     )
 
-    const { data: debridTorrents, isLoading: isLoadingDebrid } = useDebridGetTorrents(
+    const { data: rawDebridTorrents, isLoading: isLoadingDebrid } = useDebridGetTorrents(
         isConnected && activeTab === "debrid",
         3000,
     )
+
+    const torrents = React.useMemo(() => {
+        return rawTorrents?.filter(t => {
+            const isComplete = t.progress >= 1
+            const isPausedOrStopped = t.status === "paused" || t.status === "stopped"
+            return !(isComplete && isPausedOrStopped)
+        })
+    }, [rawTorrents])
+
+    const debridTorrents = React.useMemo(() => {
+        return rawDebridTorrents?.filter((item: any) => {
+            const isComplete = item.completionPercentage >= 100
+            const isPausedOrStopped = item.status?.toLowerCase() === "paused" || item.status?.toLowerCase() === "stopped"
+            return !(isComplete && isPausedOrStopped)
+        })
+    }, [rawDebridTorrents])
 
     const { mutate: performTorrentAction } = useTorrentClientAction()
     const { mutate: downloadDebrid } = useDebridDownloadTorrent()
@@ -167,25 +183,28 @@ function StatusBadge({ status }: { status: string }) {
 
     switch (status.toLowerCase()) {
         case "downloading":
-            bgClass = "bg-blue-500/10 border border-blue-500/20"
+            bgClass = "bg-blue-500/15 border"
             textClass = "text-blue-400"
             break
         case "seeding":
+            bgClass = "bg-blue-500/15 border"
+            textClass = "text-blue-400"
+            break
         case "completed":
-            bgClass = "bg-green-500/10 border border-green-500/20"
+            bgClass = "bg-green-500/15 border"
             textClass = "text-green-400"
             break
         case "paused":
         case "stopped":
-            bgClass = "bg-amber-500/10 border border-amber-500/20"
+            bgClass = "bg-amber-500/15 border"
             textClass = "text-amber-400"
             break
         case "error":
-            bgClass = "bg-red-500/10 border border-red-500/20"
+            bgClass = "bg-red-500/15 border"
             textClass = "text-red-400"
             break
         case "stalled":
-            bgClass = "bg-orange-500/10 border border-orange-500/20"
+            bgClass = "bg-orange-500/15 border"
             textClass = "text-orange-400"
             break
     }
@@ -214,10 +233,10 @@ function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "p
                 <Text className="text-xs text-white/40">{torrent.size}</Text>
                 <View className="flex-row items-center gap-2">
                     {!!torrent.downSpeed && torrent.downSpeed !== "0 B/s" && (
-                        <Text className="text-xs text-white/40">↓ {torrent.downSpeed}</Text>
+                        <Text className="text-xs text-white/40">D: {torrent.downSpeed}</Text>
                     )}
                     {!!torrent.upSpeed && torrent.upSpeed !== "0 B/s" && (
-                        <Text className="text-xs text-white/40">↑ {torrent.upSpeed}</Text>
+                        <Text className="text-xs text-white/40">U: {torrent.upSpeed}</Text>
                     )}
                 </View>
                 {!!torrent.eta && torrent.eta !== "0s" && (
@@ -227,7 +246,7 @@ function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "p
 
             <View className="mt-1">
                 <View className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                    <View className="h-full bg-brand-300 rounded-full" style={{ width: `${progressPercent}%` }} />
+                    <View className="h-full bg-brand-500 rounded-full" style={{ width: `${progressPercent}%` }} />
                 </View>
                 <View className="flex-row justify-between mt-1">
                     <Text className="text-[10px] text-white/40">Progress</Text>
@@ -247,7 +266,7 @@ function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "p
                     onPress={() => onAction("remove")}
                     className="flex-row items-center bg-red-500/10 active:bg-red-500/20 px-3 py-1.5 rounded-lg gap-1 border border-red-500/20"
                 >
-                    <Ionicons name="trash-outline" size={14} color="#f87171" />
+                    <Ionicons name="trash-outline" size={14} color="rgb(190 110 110)" />
                     <Text className="text-red-400 text-xs font-medium">Delete</Text>
                 </Pressable>
             </View>
@@ -280,7 +299,7 @@ function DebridRow({
             <View className="flex-row items-center justify-between">
                 <Text className="text-xs text-white/40">{item.formattedSize}</Text>
                 {!!item.speed && (
-                    <Text className="text-xs text-white/40">↓ {item.speed}</Text>
+                    <Text className="text-xs text-white/40">{item.speed}</Text>
                 )}
                 {!!item.eta && (
                     <Text className="text-xs text-white/40">ETA: {item.eta}</Text>
@@ -292,7 +311,7 @@ function DebridRow({
                     <View className="h-full bg-brand-300 rounded-full" style={{ width: `${item.completionPercentage}%` }} />
                 </View>
                 <View className="flex-row justify-between mt-1">
-                    <Text className="text-[10px] text-white/40">Debrid Progress</Text>
+                    <Text className="text-[10px] text-white/40">Progress</Text>
                     <Text className="text-[10px] text-white/60 font-semibold">{item.completionPercentage}%</Text>
                 </View>
             </View>
@@ -303,7 +322,7 @@ function DebridRow({
                         onPress={onCancel}
                         className="flex-row items-center bg-amber-500/10 active:bg-amber-500/20 px-3 py-1.5 rounded-lg gap-1 border border-amber-500/20"
                     >
-                        <Ionicons name="close-circle-outline" size={14} color="#fbbf24" />
+                        <Ionicons name="close-circle-outline" size={14} color="rgb(190 155 95)" />
                         <Text className="text-amber-400 text-xs font-medium">Cancel Local</Text>
                     </Pressable>
                 ) : item.isReady ? (
@@ -311,7 +330,7 @@ function DebridRow({
                         onPress={onDownload}
                         className="flex-row items-center bg-brand-500/10 active:bg-brand-500/20 px-3 py-1.5 rounded-lg gap-1 border border-brand-500/20"
                     >
-                        <Ionicons name="cloud-download-outline" size={14} color="#6366f1" />
+                        <Ionicons name="cloud-download-outline" size={14} color="rgb(159 146 255)" />
                         <Text className="text-brand-400 text-xs font-medium">Download to Server</Text>
                     </Pressable>
                 ) : null}
@@ -320,7 +339,7 @@ function DebridRow({
                     onPress={onDelete}
                     className="flex-row items-center bg-red-500/10 active:bg-red-500/20 px-3 py-1.5 rounded-lg gap-1 border border-red-500/20"
                 >
-                    <Ionicons name="trash-outline" size={14} color="#f87171" />
+                    <Ionicons name="trash-outline" size={14} color="rgb(190 110 110)" />
                     <Text className="text-red-400 text-xs font-medium">Delete</Text>
                 </Pressable>
             </View>

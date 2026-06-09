@@ -36,7 +36,7 @@ import { useAtomValue } from "jotai/react"
 import * as React from "react"
 
 export const NONE_PROVIDER = "none"
-export const TORRENT_RESOLUTIONS = ["1080p", "720p", "480p"] as const
+export const TORRENT_RESOLUTIONS = ["2160", "1080", "720", "540", "480"] as const
 const TORBOX_DEBRID_PROVIDER = "torbox"
 
 export type StreamMode = "torrent" | "debrid"
@@ -56,9 +56,10 @@ type PreviousBatchSelection = {
 
 type UseTorrentStreamControllerParams = {
     entry: Anime_Entry
+    mode?: "stream" | "download"
 }
 
-export function useTorrentStreamController({ entry }: UseTorrentStreamControllerParams) {
+export function useTorrentStreamController({ entry, mode = "stream" }: UseTorrentStreamControllerParams) {
     const serverStatus = useServerStatus()
     const preferredStreamMode = React.useMemo(() => getDefaultStreamMode(serverStatus), [serverStatus])
     const hasTorrentStreaming = React.useMemo(
@@ -90,10 +91,10 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
     const deferredSearchQuery = React.useDeferredValue(searchQuery)
     const [smartSearchBatch, setSmartSearchBatch] = React.useState(false)
     const [torrentResolution, setTorrentResolutionState] = React.useState<TorrentResolution>(
-        toMobileResolution(serverStatus?.torrentstreamSettings?.preferredResolution) ?? "1080p",
+        toMobileResolution(serverStatus?.torrentstreamSettings?.preferredResolution) ?? "1080",
     )
     const [debridResolution, setDebridResolutionState] = React.useState<TorrentResolution>(
-        toMobileResolution(serverStatus?.debridSettings?.streamPreferredResolution) ?? "1080p",
+        toMobileResolution(serverStatus?.debridSettings?.streamPreferredResolution) ?? "1080",
     )
     const [bestRelease, setBestRelease] = React.useState(false)
     const [torrentAutoSelect, setTorrentAutoSelect] = React.useState(serverStatus?.torrentstreamSettings?.autoSelect ?? false)
@@ -120,11 +121,11 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
     }, [availableModes, preferredStreamMode])
 
     React.useEffect(() => {
-        setTorrentResolutionState(toMobileResolution(serverStatus?.torrentstreamSettings?.preferredResolution) ?? "1080p")
+        setTorrentResolutionState(toMobileResolution(serverStatus?.torrentstreamSettings?.preferredResolution) ?? "1080")
     }, [serverStatus?.torrentstreamSettings?.preferredResolution])
 
     React.useEffect(() => {
-        setDebridResolutionState(toMobileResolution(serverStatus?.debridSettings?.streamPreferredResolution) ?? "1080p")
+        setDebridResolutionState(toMobileResolution(serverStatus?.debridSettings?.streamPreferredResolution) ?? "1080")
     }, [serverStatus?.debridSettings?.streamPreferredResolution])
 
     React.useEffect(() => {
@@ -207,6 +208,18 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
             setSearchQuery(title)
         }
     }, [searchMode, entry.media?.title?.romaji, entry.media?.title?.english, entry.media?.title?.userPreferred])
+
+    React.useEffect(() => {
+        if (bestRelease && !selectedProvider?.settings?.smartSearchFilters?.includes("bestReleases")) {
+            setBestRelease(false)
+        }
+    }, [bestRelease, selectedProvider])
+
+    React.useEffect(() => {
+        if (smartSearchBatch && !selectedProvider?.settings?.smartSearchFilters?.includes("batch")) {
+            setSmartSearchBatch(false)
+        }
+    }, [smartSearchBatch, selectedProvider])
 
     const mediaId = entry.media?.id ?? 0
     const absoluteOffset = entry.downloadInfo?.absoluteOffset ?? 0
@@ -645,22 +658,37 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
             if (episodeSelectionLockedRef.current) return
 
             setSelectedEpisodeNumber(episode.episodeNumber)
-            const mode = streamMode
+            const sMode = streamMode
+
+            if (mode === "download") {
+                if (usePreviousBatch && batchHistory?.torrent && episode.aniDBEpisode) {
+                    const previousBatchSelection = getPreviousBatchSelection(episode, sMode)
+                    if (previousBatchSelection) {
+                        setSelectedTorrent(previousBatchSelection.torrent)
+                        setSheetStage("files")
+                        setSelectedFileId(previousBatchSelection.fileId || null)
+                        setPickerOpen(true)
+                        return
+                    }
+                }
+                openPickerForEpisode(episode, "torrents", sMode)
+                return
+            }
 
             if (autoSelect && !episodeCollection?.hasMappingError && episode.aniDBEpisode) {
-                startAutoSelectedStream(episode, mode)
+                startAutoSelectedStream(episode, sMode)
                 return
             }
 
             if (usePreviousBatch && batchHistory?.torrent && episode.aniDBEpisode) {
-                const previousBatchSelection = getPreviousBatchSelection(episode, mode)
+                const previousBatchSelection = getPreviousBatchSelection(episode, sMode)
 
                 if (!previousBatchSelection) {
-                    openPickerForEpisode(episode, "torrents", mode)
+                    openPickerForEpisode(episode, "torrents", sMode)
                     return
                 }
 
-                if (mode === "debrid" && autoSelectFile) {
+                if (sMode === "debrid" && autoSelectFile) {
                     startManualStream({
                         episode,
                         torrent: previousBatchSelection.torrent,
@@ -668,7 +696,7 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
                         fileIndex: previousBatchSelection.fileIndex ?? undefined,
                         batchEpisodeFiles: previousBatchSelection.batchEpisodeFiles,
                         launchMode: "previous-batch",
-                    }, mode)
+                    }, sMode)
                     return
                 }
 
@@ -688,7 +716,7 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
                         fileIndex: previousBatchSelection.fileIndex,
                         batchEpisodeFiles: previousBatchSelection.batchEpisodeFiles,
                         launchMode: "previous-batch",
-                    }, mode)
+                    }, sMode)
                     return
                 }
 
@@ -699,10 +727,10 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
                 return
             }
 
-            openPickerForEpisode(episode, "torrents", mode)
+            openPickerForEpisode(episode, "torrents", sMode)
         },
         [autoSelect, autoSelectFile, batchHistory?.torrent, episodeCollection?.hasMappingError, getPreviousBatchSelection, openPickerForEpisode,
-            startAutoSelectedStream, startManualStream, streamMode, usePreviousBatch])
+            startAutoSelectedStream, startManualStream, streamMode, usePreviousBatch, mode])
 
     const startPreviousBatchStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode) => {
         if (!episode.aniDBEpisode) {
@@ -778,6 +806,8 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
             const fileId = getFileSelectionValue(file)
             setSelectedFileId(fileId)
 
+            if (mode === "download") return
+
             const timer = setTimeout(() => {
                 startManualStream({
                     episode: selectedEpisode,
@@ -790,7 +820,7 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
 
             return () => clearTimeout(timer)
         }
-    }, [buildBatchEpisodeFiles, filePreviews, selectedEpisode, selectedTorrent, sheetStage, startManualStream, streamMode])
+    }, [buildBatchEpisodeFiles, filePreviews, selectedEpisode, selectedTorrent, sheetStage, startManualStream, streamMode, mode])
 
     const stopCurrentStream = React.useCallback(() => {
         if (streamMode === "debrid") {
@@ -842,6 +872,7 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
         searchQuery,
         selectedEpisode,
         selectedEpisodeNumber,
+        setSelectedEpisodeNumber,
         selectedFileId,
         selectedProvider,
         selectedProviderId,
@@ -887,9 +918,10 @@ export function useTorrentStreamController({ entry }: UseTorrentStreamController
 
 function toMobileResolution(value?: string | null): TorrentResolution {
     if (!value) return undefined
-    if (value === "1080" || value === "1080p") return "1080p"
-    if (value === "720" || value === "720p") return "720p"
-    if (value === "480" || value === "480p") return "480p"
+    const clean = value.replace("p", "")
+    if (clean === "2160" || clean === "1080" || clean === "720" || clean === "540" || clean === "480") {
+        return clean as TorrentResolution
+    }
     return undefined
 }
 

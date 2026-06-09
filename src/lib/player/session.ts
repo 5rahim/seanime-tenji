@@ -10,6 +10,7 @@ import type {
     DebridClient_StreamState,
     Torrentstream_TorrentStatus,
 } from "@/api/generated/types"
+import { usePlaybackCancelManualTracking } from "@/api/hooks/playback_manager.hooks"
 import { useServerUrl } from "@/atoms/server.atoms"
 import { websocketAtom } from "@/atoms/websocket.atoms"
 import { logger } from "@/lib/utils/logger"
@@ -446,9 +447,12 @@ export function usePlayerEventListener() {
     const [, setDebridStreamState] = useAtom(debridStreamStateAtom)
     const [, setActiveStreamSession] = useAtom(activeStreamSessionAtom)
 
+    const { mutate: cancelManualTracking } = usePlaybackCancelManualTracking({})
+
     const pendingInfoRef = React.useRef<TorrentStreamPendingInfo | null>(null)
     const streamSessionModeRef = React.useRef<StreamSessionMode | null>(null)
     const loadingFallbackTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const cancelManualTrackingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const pendingInfo = useAtomValue(torrentStreamPendingInfoAtom)
     const streamSessionMode = useAtomValue(streamSessionModeAtom)
     React.useEffect(() => {
@@ -468,8 +472,16 @@ export function usePlayerEventListener() {
                 }
             }
 
+            const clearCancelManualTrackingTimer = () => {
+                if (cancelManualTrackingTimer.current) {
+                    clearTimeout(cancelManualTrackingTimer.current)
+                    cancelManualTrackingTimer.current = null
+                }
+            }
+
             const resetTorrentStreamState = () => {
                 clearLoadingFallback()
+                clearCancelManualTrackingTimer()
                 streamSessionModeRef.current = null
                 setIsPreparing(false)
                 setPendingInfo(null)
@@ -623,6 +635,12 @@ export function usePlayerEventListener() {
                         return
                     }
 
+                    clearCancelManualTrackingTimer()
+                    cancelManualTrackingTimer.current = setTimeout(() => {
+                        log.info("Cancelling manual tracking on server as it is not relevant to Tenji")
+                        cancelManualTracking()
+                    }, 2000)
+
                     const base = getServerBaseUrl(serverUrl)
                     const resolvedUrl = payload.url
                         .replace("{{SCHEME}}://{{HOST}}", base)
@@ -709,6 +727,7 @@ export function usePlayerEventListener() {
             socket.addEventListener("message", handleMessage)
             return () => {
                 clearLoadingFallback()
+                clearCancelManualTrackingTimer()
                 socket.removeEventListener("message", handleMessage)
             }
         },

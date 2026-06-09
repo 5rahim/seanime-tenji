@@ -1,7 +1,10 @@
+import { buildSeaQuery } from "@/api/client/requests"
 import { appendServerHMACToken } from "@/api/client/server-auth"
 import { getServerBaseUrl } from "@/api/client/server-url"
-import { Anime_Entry, Anime_Episode } from "@/api/generated/types"
+import { Anime_Entry, Anime_Episode, Anime_LocalFile, Status } from "@/api/generated/types"
 import { getDownloadSettings, getDownloadWorkerCount } from "@/atoms/download-settings.atoms"
+import { getStoredJsonValue } from "@/atoms/storage"
+import { isManualOfflineModeEnabled } from "@/lib/connection-state"
 import {
     batchDownloadStoreWrites,
     clearAllAnimeDownloadRecords,
@@ -10,14 +13,17 @@ import {
     type DownloadStatus,
     getAnimeInfo,
     getDownloadedEpisode,
+    getDownloadedEpisodesForMedia,
     getDownloadEpisodeId,
     markDownloadCompleted,
     markDownloadFailed,
     markDownloadPending,
+    readGlobalIndex,
     removeAllAnimeDownloadsForMedia,
     removeDownloadedEpisode,
     saveAnimeInfo,
     saveDownloadedEpisode,
+    updateAnimeInfoDownloadCount,
     updateDownloadProgress,
 } from "@/lib/downloads/download-store"
 import {
@@ -106,6 +112,7 @@ type SaveEpisodeDownloadRecordOptions = {
     startedAt?: number
     progress?: number
     fileSize?: number
+    isLocalServerFile?: boolean
 }
 
 const activeDownloads = new Map<string, ActiveDownload>()
@@ -222,6 +229,7 @@ function saveEpisodeDownloadRecord(
             startedAt: options?.startedAt ?? Date.now(),
             errorMessage: undefined,
             completedAt: undefined,
+            isLocalServerFile: options?.isLocalServerFile ?? false,
         })
     })
 }
@@ -506,6 +514,9 @@ export async function startEpisodeDownload(
 
     saveAnimeDownloadEntrySnapshot(entry)
 
+    const registered = await tryRegisterLocalFile(serverUrl, entry, episode)
+    if (registered) return
+
     await enqueueAnimeDownload(buildEpisodeDownloadSource(serverUrl, entry, episode))
 }
 
@@ -519,7 +530,17 @@ export async function startBatchDownload(
 ): Promise<void> {
     saveAnimeDownloadEntrySnapshot(entry)
 
-    const pendingEpisodes = episodes.filter(episode => {
+    const remainingEpisodes: Anime_Episode[] = []
+    for (const episode of episodes) {
+        const registered = await tryRegisterLocalFile(serverUrl, entry, episode)
+        if (!registered) {
+            remainingEpisodes.push(episode)
+        }
+    }
+
+    if (remainingEpisodes.length === 0) return
+
+    const pendingEpisodes = remainingEpisodes.filter(episode => {
         const episodeId = getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber)
         if (activeDownloads.has(dlKey(entry.mediaId, episodeId)) || hasQueuedAnimeDownload(entry.mediaId, episodeId)) {
             return false
@@ -681,4 +702,238 @@ export function formatBytes(bytes: number): string {
     const sizes = ["B", "KB", "MB", "GB"]
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+export function isLocalServer(serverUrlStr: string): boolean {
+    if (!serverUrlStr) return false
+    try {
+        const url = new URL(serverUrlStr)
+        const hostname = url.hostname.toLowerCase()
+        if (
+            hostname === "localhost" ||
+            hostname === "127.0.0.1" ||
+            hostname === "::1" ||
+            hostname === "0.0.0.0"
+        ) {
+            return true
+        }
+    }
+    catch {
+        if (
+            serverUrlStr.includes("localhost") ||
+            serverUrlStr.includes("127.0.0.1") ||
+            serverUrlStr.includes("::1") ||
+            serverUrlStr.includes("0.0.0.0")
+        ) {
+            return true
+        }
+    }
+    const status = getStoredJsonValue<Status>("sea-server-status")
+    const serverOS = status?.os?.toLowerCase()
+    if (serverOS === "android" || serverOS === "ios") {
+        return true
+    }
+    return false
+}
+
+function toLocalFileUri(path: string): string {
+    const encoded = encodeURI(path)
+        .replace(/\[/g, "%5B")
+        .replace(/\]/g, "%5D")
+        .replace(/#/g, "%23")
+        .replace(/\?/g, "%3F")
+    return encoded.startsWith("/") ? `file://${encoded}` : `file:///${encoded}`
+}
+
+export async function tryRegisterLocalFile(
+    serverUrl: string,
+    entry: Anime_Entry,
+    episode: Anime_Episode,
+): Promise<boolean> {
+    if (!isLocalServer(serverUrl)) return false
+    const serverFilePath = episode.localFile?.path
+    if (!serverFilePath) return false
+
+    const fileUri = toLocalFileUri(serverFilePath)
+
+    let fileSize = 0
+    try {
+        const rawUrl = `${getServerBaseUrl(serverUrl)}/api/v1/mediastream/file?path=${encodeURIComponent(serverFilePath)}`
+        const fileUrl = appendServerHMACToken(rawUrl, "/api/v1/mediastream/file")
+        const response = await fetch(fileUrl, { method: "HEAD" })
+        const contentLength = response.headers.get("content-length")
+        if (contentLength) {
+            fileSize = parseInt(contentLength, 10)
+        }
+    }
+    catch {
+    }
+
+    if (fileSize === 0) {
+        const file = new File(fileUri)
+        fileSize = file.exists ? (file.size ?? 0) : 0
+    }
+
+    const source = buildEpisodeDownloadSource(serverUrl, entry, episode)
+    saveEpisodeDownloadRecord(source, "completed", fileUri, {
+        fileSize,
+        progress: 1,
+        isLocalServerFile: true,
+    })
+    markDownloadCompleted(source.mediaId, source.episodeId, fileUri, fileSize)
+    return true
+}
+
+export async function syncLocalServerFilesToDownloads(serverUrl: string): Promise<void> {
+    if (isManualOfflineModeEnabled()) return
+    if (!isLocalServer(serverUrl)) return
+
+    try {
+        const localFiles = await buildSeaQuery<Anime_LocalFile[]>({
+            serverUrl,
+            endpoint: "/api/v1/library/local-files",
+            method: "GET",
+            muteError: true,
+        })
+        if (!Array.isArray(localFiles)) return
+
+        const libraryCollection = await buildSeaQuery<any>({
+            serverUrl,
+            endpoint: "/api/v1/library/collection",
+            method: "GET",
+            muteError: true,
+        })
+
+        const mediaMap = new Map<number, any>()
+        const entryMap = new Map<number, Anime_Entry>()
+        if (libraryCollection?.lists) {
+            for (const list of libraryCollection.lists) {
+                if (list.entries) {
+                    for (const entry of list.entries) {
+                        if (entry.media) {
+                            mediaMap.set(entry.mediaId, entry.media)
+                            entryMap.set(entry.mediaId, entry)
+                        }
+                    }
+                }
+            }
+        }
+
+        const localServerFilePaths = new Set(localFiles.map(lf => lf.path))
+        const mediaIds = readGlobalIndex()
+        const allLocalRecordsToClean = []
+
+        for (const mediaId of mediaIds) {
+            const episodes = getDownloadedEpisodesForMedia(mediaId)
+            for (const ep of episodes) {
+                if (ep.localFilePath && (ep.isLocalServerFile || !ep.localFilePath.includes("/downloads/"))) {
+                    const serverPath = ep.serverFilePath
+                    if (!localServerFilePaths.has(serverPath)) {
+                        allLocalRecordsToClean.push({ mediaId: ep.mediaId, aniDBEpisode: ep.aniDBEpisode })
+                    }
+                }
+            }
+        }
+
+        for (const record of allLocalRecordsToClean) {
+            removeDownloadedEpisode(record.mediaId, record.aniDBEpisode)
+        }
+
+        const mediaIdsToUpdate = new Set<number>()
+
+        for (const lf of localFiles) {
+            if (!lf.path || lf.mediaId === 0 || !lf.metadata) continue
+
+            const fileUri = toLocalFileUri(lf.path)
+            const episodeId = getDownloadEpisodeId(lf.metadata.aniDBEpisode, lf.metadata.type, lf.metadata.episode, lf.path)
+            const existing = getDownloadedEpisode(lf.mediaId, episodeId)
+
+            if (!existing || existing.status !== "completed" || existing.fileSize === 0) {
+                let fileSize = 0
+                try {
+                    const rawUrl = `${getServerBaseUrl(serverUrl)}/api/v1/mediastream/file?path=${encodeURIComponent(lf.path)}`
+                    const fileUrl = appendServerHMACToken(rawUrl, "/api/v1/mediastream/file")
+                    const response = await fetch(fileUrl, { method: "HEAD" })
+                    const contentLength = response.headers.get("content-length")
+                    if (contentLength) {
+                        fileSize = parseInt(contentLength, 10)
+                    }
+                }
+                catch (e) {
+                    log.error("Failed to get file size via HEAD request", e)
+                }
+
+                if (fileSize === 0) {
+                    const file = new File(fileUri)
+                    fileSize = file.exists ? (file.size ?? 0) : 0
+                }
+
+                const media = mediaMap.get(lf.mediaId)
+                const animeInfo = {
+                    mediaId: lf.mediaId,
+                    title: media?.title?.english
+                        || media?.title?.romaji
+                        || media?.title?.userPreferred
+                        || `Anime #${lf.mediaId}`,
+                    coverImageUrl: media?.coverImage?.large,
+                    bannerImageUrl: media?.bannerImage,
+                    totalEpisodes: media?.episodes,
+                    downloadedCount: 0,
+                }
+
+                const displayTitle = lf.metadata.type === "main"
+                    ? `Episode ${lf.metadata.episode}`
+                    : `${lf.metadata.type.toUpperCase()} Episode ${lf.metadata.episode}`
+
+                batchDownloadStoreWrites(() => {
+                    saveAnimeInfo(animeInfo)
+                    saveDownloadedEpisode({
+                        mediaId: lf.mediaId,
+                        episodeNumber: lf.metadata!.episode,
+                        aniDBEpisode: episodeId,
+                        localFilePath: fileUri,
+                        serverFilePath: lf.path,
+                        displayTitle,
+                        episodeTitle: "",
+                        type: lf.metadata!.type as "main" | "special" | "nc",
+                        thumbnailUrl: media?.bannerImage,
+                        fileSize,
+                        status: "completed",
+                        progress: 1,
+                        startedAt: Date.now(),
+                        completedAt: Date.now(),
+                        isLocalServerFile: true,
+                    })
+                })
+                mediaIdsToUpdate.add(lf.mediaId)
+            } else if (existing.isLocalServerFile === undefined) {
+                batchDownloadStoreWrites(() => {
+                    existing.isLocalServerFile = true
+                    saveDownloadedEpisode(existing)
+                })
+            }
+        }
+
+        const allCompletedMediaIds = new Set<number>()
+        for (const lf of localFiles) {
+            if (lf.mediaId && lf.mediaId !== 0) {
+                allCompletedMediaIds.add(lf.mediaId)
+            }
+        }
+
+        batchDownloadStoreWrites(() => {
+            for (const mediaId of allCompletedMediaIds) {
+                updateAnimeInfoDownloadCount(mediaId)
+                const entry = entryMap.get(mediaId)
+                if (entry) {
+                    saveAnimeDownloadEntrySnapshot(entry)
+                }
+            }
+        })
+    }
+    catch (e: any) {
+        if (e?.message !== "OFFLINE_MODE_ENABLED") {
+            log.warning("syncLocalServerFilesToDownloads failed", e)
+        }
+    }
 }

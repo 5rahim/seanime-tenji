@@ -22,6 +22,7 @@ export type DownloadedEpisode = {
     startedAt: number
     completedAt?: number
     errorMessage?: string
+    isLocalServerFile?: boolean
 }
 
 export type DownloadedAnimeInfo = {
@@ -98,7 +99,7 @@ function writeEpisodeIndex(mediaId: number, episodeIds: string[]): void {
     store.set(mediaIndexKey(mediaId), JSON.stringify(episodeIds))
 }
 
-function readGlobalIndex(): number[] {
+export function readGlobalIndex(): number[] {
     const raw = store.getString(GLOBAL_INDEX_KEY)
     if (!raw) return []
     try {
@@ -407,7 +408,7 @@ export function getDownloadedEpisodeCount(): number {
     return count
 }
 
-function updateAnimeInfoDownloadCount(mediaId: number): void {
+export function updateAnimeInfoDownloadCount(mediaId: number): void {
     const info = getAnimeInfo(mediaId)
     if (!info) return
     info.downloadedCount = getCompletedEpisodesForMedia(mediaId).length

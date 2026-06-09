@@ -8,6 +8,7 @@ import { MediaEntryGrid } from "@/components/features/media/media-entry-grid"
 import { TabFadeView } from "@/components/layout/tab-fade-view"
 import { CenteredSpinner } from "@/components/shared/centered-spinner"
 import { LIBRARY_SEARCH_HEADER_BASE_HEIGHT, LibrarySearchHeader } from "@/components/shared/library-search-header"
+import { LuffyError } from "@/components/shared/luffy-error"
 import { OfflineBanner } from "@/components/shared/offline-banner"
 import { ContinueWatchingItem, useAnimeLibraryCollection } from "@/hooks/use-anime-library-collection"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
@@ -197,6 +198,12 @@ export default function LibraryScreen() {
                                 </View>
                             }
                             ListFooterComponent={<DownloadedAnimeList />}
+                            ListEmptyComponent={isConnected && continueWatchingList.length === 0 ? (
+                                <LuffyError
+                                    title="Your anime library is empty"
+                                    description="Add anime to your collection or use the Discover tab to find something to watch."
+                                />
+                            ) : null}
                             contentInsetAdjustmentBehavior="never"
                             contentContainerStyle={{
                                 paddingTop: hasHero ? 0 : searchHeaderHeight,

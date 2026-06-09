@@ -4,6 +4,7 @@ import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { Anime_Entry, Manga_Entry } from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
 import { getAllDownloadedAnime, getAllDownloadedManga } from "@/lib/downloads"
+import { syncLocalServerFilesToDownloads } from "@/lib/downloads/download-manager"
 import { saveAnimeDownloadEntrySnapshot, saveMangaDownloadEntrySnapshot } from "@/lib/offline/download-entry-snapshot-store"
 import { logger } from "@/lib/utils/logger"
 import { useQueryClient } from "@tanstack/react-query"
@@ -56,11 +57,21 @@ export function useDownloadSnapshotRefreshService() {
         const now = Date.now()
         if (now - lastRefreshAtRef.current < SNAPSHOT_REFRESH_MIN_GAP_MS) return
 
+        refreshInFlightRef.current = true
+        try {
+            await syncLocalServerFilesToDownloads(serverUrl)
+        }
+        catch (e) {
+            log.warning("Local server sync failed in snapshot refresh service", e)
+        }
+
         const downloadedAnime = getAllDownloadedAnime()
         const downloadedManga = getAllDownloadedManga()
-        if (downloadedAnime.length === 0 && downloadedManga.length === 0) return
+        if (downloadedAnime.length === 0 && downloadedManga.length === 0) {
+            refreshInFlightRef.current = false
+            return
+        }
 
-        refreshInFlightRef.current = true
         const baseUrl = getServerBaseUrl(serverUrl)
         log.info(`Refreshing ${downloadedAnime.length} anime and ${downloadedManga.length} manga snapshots (${reason}) from ${baseUrl}`)
 
