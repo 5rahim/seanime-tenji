@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons"
 import Slider from "@react-native-community/slider"
 import * as Haptics from "expo-haptics"
 import React from "react"
-import { Alert, View } from "react-native"
+import { Alert, Platform, Pressable, View } from "react-native"
 import { NativeViewGestureHandler } from "react-native-gesture-handler"
 
 type EditAnilistEntryProps = {
@@ -283,27 +283,36 @@ export function EditAnilistEntry(props: EditAnilistEntryProps) {
                                     className="flex-1"
                                     label="Score"
                                     icon="star-outline"
-                                    trailing={formState.score ?
+                                    trailing={Platform.OS !== "android" && formState.score ?
                                         <View className="text-md text-muted-foreground flex-row"><Text className="text-foreground font-semibold">{formState.score}</Text><Text
                                             className="text-muted-foreground"
-                                        >{` / 10`}</Text></View> : <Text className="text-muted-foreground text-xs">Not scored</Text>}
+                                        >{` / 10`}</Text></View> : Platform.OS !== "android"
+                                            ? <Text className="text-muted-foreground text-xs">Not scored</Text>
+                                            : undefined}
                                 >
-                                    <NativeViewGestureHandler disallowInterruption>
-                                        <View className="justify-center" style={{ height: 40 }}>
-                                            <Slider
-                                                minimumValue={0}
-                                                maximumValue={10}
-                                                step={0.5}
-                                                value={Number.parseFloat(formState.score) || 0}
-                                                onSlidingStart={handleScoreSlidingStart}
-                                                onValueChange={handleScoreChange}
-                                                onSlidingComplete={handleScoreSlidingComplete}
-                                                minimumTrackTintColor="rgb(97 82 223)"
-                                                maximumTrackTintColor="rgba(255,255,255,0.15)"
-                                                thumbTintColor="rgb(97 82 223)"
-                                            />
-                                        </View>
-                                    </NativeViewGestureHandler>
+                                    {Platform.OS === "android" ? (
+                                        <ScoreStepper
+                                            value={formState.score}
+                                            onChange={(val) => handleChange("score", val)}
+                                        />
+                                    ) : (
+                                        <NativeViewGestureHandler disallowInterruption>
+                                            <View className="justify-center" style={{ height: 40 }}>
+                                                <Slider
+                                                    minimumValue={0}
+                                                    maximumValue={10}
+                                                    step={0.5}
+                                                    value={Number.parseFloat(formState.score) || 0}
+                                                    onSlidingStart={handleScoreSlidingStart}
+                                                    onValueChange={handleScoreChange}
+                                                    onSlidingComplete={handleScoreSlidingComplete}
+                                                    minimumTrackTintColor="rgb(97 82 223)"
+                                                    maximumTrackTintColor="rgba(255,255,255,0.15)"
+                                                    thumbTintColor="rgb(97 82 223)"
+                                                />
+                                            </View>
+                                        </NativeViewGestureHandler>
+                                    )}
                                 </FormField>
 
                                 <FormField
@@ -377,3 +386,82 @@ export function EditAnilistEntry(props: EditAnilistEntryProps) {
         </>
     )
 }
+
+type ScoreStepperProps = {
+    value: string
+    onChange: (value: string) => void
+}
+
+const ScoreStepper = React.memo(function ScoreStepper({ value, onChange }: ScoreStepperProps) {
+    const valueRef = React.useRef(value)
+    React.useEffect(() => {
+        valueRef.current = value
+    }, [value])
+
+    const intervalRef = React.useRef<NodeJS.Timeout | null>(null)
+    const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+    const updateScore = React.useCallback((direction: "increment" | "decrement") => {
+        const current = Number.parseFloat(valueRef.current) || 0
+        let next = direction === "increment" ? current + 0.5 : current - 0.5
+        next = Math.min(Math.max(next, 0), 10)
+        onChange(next === 0 ? "" : String(next))
+        void Haptics.selectionAsync().catch(() => undefined)
+    }, [onChange])
+
+    const startTimer = React.useCallback((direction: "increment" | "decrement") => {
+        stopTimer()
+        timeoutRef.current = setTimeout(() => {
+            intervalRef.current = setInterval(() => {
+                updateScore(direction)
+            }, 80)
+        }, 400)
+    }, [updateScore])
+
+    const stopTimer = React.useCallback(() => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        if (intervalRef.current) clearInterval(intervalRef.current)
+    }, [])
+
+    React.useEffect(() => {
+        return () => stopTimer()
+    }, [stopTimer])
+
+    const currentScore = Number.parseFloat(value) || 0
+
+    return (
+        <View className="flex-row items-center justify-between bg-white/[0.03] border border-white/10 rounded-xl px-2 h-11">
+            <Pressable
+                onPress={() => updateScore("decrement")}
+                onPressIn={() => startTimer("decrement")}
+                onPressOut={stopTimer}
+                disabled={currentScore <= 0}
+                className={cn(
+                    "w-10 h-7 items-center justify-center rounded-lg active:bg-white/5",
+                    currentScore <= 0 && "opacity-30",
+                )}
+            >
+                <Ionicons name="remove-outline" size={20} color="white" />
+            </Pressable>
+
+            <View className="flex-1 items-center justify-center">
+                <Text className="text-base font-semibold text-foreground">
+                    {value ? `${value} / 10` : "Not scored"}
+                </Text>
+            </View>
+
+            <Pressable
+                onPress={() => updateScore("increment")}
+                onPressIn={() => startTimer("increment")}
+                onPressOut={stopTimer}
+                disabled={currentScore >= 10}
+                className={cn(
+                    "w-10 h-7 items-center justify-center rounded-lg active:bg-white/5",
+                    currentScore >= 10 && "opacity-30",
+                )}
+            >
+                <Ionicons name="add-outline" size={20} color="white" />
+            </Pressable>
+        </View>
+    )
+})
