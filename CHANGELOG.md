@@ -8,6 +8,11 @@ All notable changes to this project will be documented in this file.
 - ⚡️ Android: Trust local certs
 - 🦺 iOS: Potential fix for orientation restoration issues
 
+### OTA (6/23):
+
+- 🦺 Bypass offline mode check when changing server url
+- 🦺 Player: Fixed double tap backward seek #10
+
 ## v0.1.20
 
 - 🎉 Alpha release
