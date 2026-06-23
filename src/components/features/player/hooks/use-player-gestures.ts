@@ -200,17 +200,6 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
         }
     }, [gRef])
 
-    const handleDoubleTapSeekStart = React.useCallback((side: "left" | "right") => {
-        const pendingSideTap = pendingSideTapRef.current
-        if (!pendingSideTap || pendingSideTap.zone !== side) return
-
-        clearPendingSideTap()
-        suppressedEdgeTapRef.current = {
-            zone: side,
-            until: Date.now() + DOUBLE_TAP_THRESHOLD,
-        }
-    }, [clearPendingSideTap])
-
     const handleSingleTap = React.useCallback(() => {
         const g = gRef.current
         if (g.isPiPActive) return
@@ -226,7 +215,14 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
         toggleControls()
     }, [gRef])
 
+    const lastDoubleTapSeekTimeRef = React.useRef(0)
+    const projectedTimeRef = React.useRef<{ time: number; at: number } | null>(null)
+
     const handleDoubleTapSeek = React.useCallback((side: "left" | "right") => {
+        const now = Date.now()
+        if (now - lastDoubleTapSeekTimeRef.current < 150) return
+        lastDoubleTapSeekTimeRef.current = now
+
         const g = gRef.current
         if (g.isPiPActive || g.panel || g.controlsLocked) return
 
@@ -237,16 +233,37 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
         }
 
         const amount = g.doubleTapSeekSec
+        const currentTime = (projectedTimeRef.current && now - projectedTimeRef.current.at < DOUBLE_TAP_THRESHOLD)
+            ? projectedTimeRef.current.time
+            : g.currentTime
+        const effectiveAmount = side === "left"
+            ? Math.min(amount, currentTime)
+            : Math.min(amount, Math.max(0, g.duration - currentTime))
+
+        if (effectiveAmount <= 0) return
+
+        const newTime = side === "left"
+            ? Math.max(0, currentTime - amount)
+            : Math.min(g.duration, currentTime + amount)
+        projectedTimeRef.current = { time: newTime, at: now }
+
         const { seekRelative, showDoubleTapIndicator, scheduleHide } = latestRef.current
         if (side === "left") {
             seekRelative(-amount, true)
-            showDoubleTapIndicator("left", amount)
+            showDoubleTapIndicator("left", effectiveAmount)
         } else {
             seekRelative(amount, true)
-            showDoubleTapIndicator("right", amount)
+            showDoubleTapIndicator("right", effectiveAmount)
         }
         scheduleHide()
     }, [clearPendingSideTap, gRef])
+
+    const handleDoubleTapGestureEnd = React.useCallback((tapX: number) => {
+        const { screenWidth } = latestRef.current
+        const side = getDoubleTapSeekZone(screenWidth, tapX)
+        if (!side) return
+        handleDoubleTapSeek(side)
+    }, [handleDoubleTapSeek])
 
     const handleTapGestureEnd = React.useCallback((tapEndX: number) => {
             const tapX = tapStartXRef.current ?? tapEndX
@@ -372,54 +389,6 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
             })
             .onFinalize(() => {
                 runOnJS(setTapStartX)(null)
-            })
-
-        const leftDoubleTap = Gesture.Tap()
-            .numberOfTaps(2)
-            .maxDuration(250)
-            .maxDelay(DOUBLE_TAP_THRESHOLD)
-            .maxDistance(TAP_GESTURE_MAX_DISTANCE)
-            .shouldCancelWhenOutside(false)
-            .onTouchesDown((event, manager) => {
-                if (event.numberOfTouches > 1) {
-                    manager.fail()
-                    return
-                }
-                const x = getGestureTouchX(event)
-                const { screenWidth } = latestRef.current
-                if (x === null || getDoubleTapSeekZone(screenWidth, x) !== "left") {
-                    manager.fail()
-                    return
-                }
-                runOnJS(handleDoubleTapSeekStart)("left")
-            })
-            .onEnd((_event, success) => {
-                if (!success) return
-                runOnJS(handleDoubleTapSeek)("left")
-            })
-
-        const rightDoubleTap = Gesture.Tap()
-            .numberOfTaps(2)
-            .maxDuration(250)
-            .maxDelay(DOUBLE_TAP_THRESHOLD)
-            .maxDistance(TAP_GESTURE_MAX_DISTANCE)
-            .shouldCancelWhenOutside(false)
-            .onTouchesDown((event, manager) => {
-                if (event.numberOfTouches > 1) {
-                    manager.fail()
-                    return
-                }
-                const x = getGestureTouchX(event)
-                const { screenWidth } = latestRef.current
-                if (x === null || getDoubleTapSeekZone(screenWidth, x) !== "right") {
-                    manager.fail()
-                    return
-                }
-                runOnJS(handleDoubleTapSeekStart)("right")
-            })
-            .onEnd((_event, success) => {
-                if (!success) return
-                runOnJS(handleDoubleTapSeek)("right")
             })
 
         // long press
@@ -559,6 +528,23 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
             })
             .runOnJS(true)
 
+        // double-tap seek (zone detection deferred to JS thread via runOnJS)
+        const sideDoubleTap = Gesture.Tap()
+            .numberOfTaps(2)
+            .maxDuration(250)
+            .maxDelay(DOUBLE_TAP_THRESHOLD)
+            .maxDistance(TAP_GESTURE_MAX_DISTANCE)
+            .shouldCancelWhenOutside(false)
+            .onTouchesDown((event, manager) => {
+                if (event.numberOfTouches > 1) {
+                    manager.fail()
+                }
+            })
+            .onEnd((event, success) => {
+                if (!success) return
+                runOnJS(handleDoubleTapGestureEnd)(event.x)
+            })
+
         // pinch (zoom)
         // zoom scale during the gesture and a fit/fill mode decision on release.
         const pinchGesture = Gesture.Pinch()
@@ -588,7 +574,7 @@ export function usePlayerGestures(params: UsePlayerGesturesParams) {
 
         return Gesture.Simultaneous(
             pinchGesture,
-            Gesture.Race(longPressGesture, panGesture, Gesture.Simultaneous(leftDoubleTap, rightDoubleTap, tapGesture)),
+            Gesture.Race(longPressGesture, panGesture, Gesture.Simultaneous(sideDoubleTap, tapGesture)),
         )
     }, [])
 
