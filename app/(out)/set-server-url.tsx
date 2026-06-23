@@ -68,6 +68,7 @@ export default function Screen() {
                     method: API_ENDPOINTS.SETTINGS.GetSettings.methods[0],
                     authToken: hashedPassword,
                     muteError: true,
+                    bypassOfflineCheck: true,
                 })
 
                 await setServerStatus(null)

@@ -24,6 +24,7 @@ type SeaQuery<D> = {
     params?: D
     authToken?: string | null
     muteError?: boolean
+    bypassOfflineCheck?: boolean
 }
 
 function createSeaError(message: string, status?: number): SeaError {
@@ -79,6 +80,7 @@ export async function buildSeaQuery<T, D = unknown>(
         params,
         authToken,
         muteError,
+        bypassOfflineCheck,
     }: SeaQuery<D>): Promise<T | undefined> {
     const url = new URL(getServerBaseUrl(serverUrl) + endpoint)
     const resolvedAuthToken = authToken ?? getStoredServerAuthToken()
@@ -106,7 +108,7 @@ export async function buildSeaQuery<T, D = unknown>(
         options.body = JSON.stringify(data)
     }
 
-    if (isManualOfflineModeEnabled()) {
+    if (isManualOfflineModeEnabled() && !bypassOfflineCheck) {
         return Promise.reject(createSeaError("OFFLINE_MODE_ENABLED"))
     }
 
