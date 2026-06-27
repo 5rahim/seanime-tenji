@@ -44,6 +44,7 @@ final class MPVLayerRenderer {
 
     // KVO observation for display layer status
     private var statusObservation: NSKeyValueObservation?
+    private var foregroundObserver: NSObjectProtocol?
 
     weak var delegate: MPVLayerRendererDelegate?
 
@@ -106,9 +107,18 @@ final class MPVLayerRenderer {
     init(displayLayer: AVSampleBufferDisplayLayer) {
         self.displayLayer = displayLayer
         observeDisplayLayerStatus()
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil, queue: nil
+        ) { [weak self] _ in
+            self?.handleForegroundResume()
+        }
     }
 
     deinit {
+        if let observer = foregroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         stop()
     }
 
@@ -126,8 +136,33 @@ final class MPVLayerRenderer {
 
     private func performDecoderReset() {
         guard let handle = mpv else { return }
+
+        DispatchQueue.main.sync {
+            if #available(iOS 18.0, *) {
+                self.displayLayer.sampleBufferRenderer.flush(removingDisplayedImage: false, completionHandler: nil)
+            } else {
+                self.displayLayer.flush()
+            }
+        }
+
         commandSync(handle, ["set", "hwdec", "no"])
         commandSync(handle, ["set", "hwdec", "auto"])
+
+        let pos = cachedPosition
+        commandSync(handle, ["seek", String(pos), "absolute"])
+    }
+
+    private func handleForegroundResume() {
+        guard isRunning, let handle = mpv else { return }
+        queue.async { [weak self] in
+            guard let self else { return }
+            if self.displayLayer.status == .failed {
+                self.performDecoderReset()
+            } else {
+                let pos = self.cachedPosition
+                self.commandSync(handle, ["seek", String(pos), "absolute"])
+            }
+        }
     }
 
     // MARK: - Lifecycle
@@ -197,6 +232,11 @@ final class MPVLayerRenderer {
 
         statusObservation?.invalidate()
         statusObservation = nil
+
+        if let observer = foregroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+            foregroundObserver = nil
+        }
 
         let handle = mpv
         mpv = nil
