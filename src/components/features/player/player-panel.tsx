@@ -18,6 +18,7 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    Cpu,
     Download,
     Gauge,
     Globe,
@@ -39,7 +40,7 @@ import {
     X,
 } from "lucide-react-native"
 import React from "react"
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-native"
+import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from "react-native"
 import { Pressable } from "react-native-gesture-handler"
 import Animated, { SlideInRight, SlideOutRight } from "react-native-reanimated"
 import { AUDIO_DELAY_STEP, BRAND_ACCENT, BUTTON_SEEK_OPTIONS, SPEED_OPTIONS, SUBTITLE_DELAY_STEP, SUBTITLE_FONT_SIZE_OPTIONS } from "./constants"
@@ -118,6 +119,7 @@ export interface PlayerPanelOverlayProps {
     onToggleCenterTapPlayPause?: () => void
     onToggleSideSwipeControls?: () => void
     onToggleAutoSkipOpEd?: () => void
+    onToggleGpuNext?: () => void
     onLockScreen?: () => void
 }
 
@@ -182,6 +184,7 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
                             onToggleCenterTapPlayPause={props.onToggleCenterTapPlayPause}
                             onToggleSideSwipeControls={props.onToggleSideSwipeControls}
                             onToggleAutoSkipOpEd={props.onToggleAutoSkipOpEd}
+                            onToggleGpuNext={props.onToggleGpuNext}
                             onLockScreen={props.onLockScreen}
                         />
                     )}
@@ -339,17 +342,18 @@ function PanelSelectableRow({
 
 function MainSettingsContent({
     state, prefs, onNavigate, onStartPiP, onToggleAutoNext,
-    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onLockScreen,
+    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onToggleGpuNext, onLockScreen,
 }: {
     state: PlayerStateType; prefs: PlayerPreferences; onNavigate: (p: PlayerPanel) => void
     onStartPiP?: () => void; onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void; onToggleSideSwipeControls?: () => void
     onToggleAutoSkipOpEd?: () => void
+    onToggleGpuNext?: () => void
     onLockScreen?: () => void
 }) {
     const rows: Array<{
         label: string; value: string; panel: PlayerPanel; icon: React.ReactNode
-        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed"
+        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed" | "toggle-gpu-next"
     }> = [
         {
             label: "Playback Speed",
@@ -419,6 +423,17 @@ function MainSettingsContent({
         },
     ]
 
+    if (Platform.OS === "android") {
+        rows.push({
+            label: "GPU Renderer",
+            value: prefs.useGpuNext ? "gpu-next" : "gpu (legacy)",
+            panel: "main",
+            icon: <Cpu size={15} color="rgba(255,255,255,0.6)" />,
+            accent: prefs.useGpuNext ? BRAND_ACCENT : undefined,
+            action: "toggle-gpu-next",
+        })
+    }
+
     return (
         <View>
             <SettingsCard
@@ -427,6 +442,7 @@ function MainSettingsContent({
                 onToggleCenterTapPlayPause={onToggleCenterTapPlayPause}
                 onToggleSideSwipeControls={onToggleSideSwipeControls}
                 onToggleAutoSkipOpEd={onToggleAutoSkipOpEd}
+                onToggleGpuNext={onToggleGpuNext}
                 onLockScreen={onLockScreen}
             />
         </View>
@@ -1210,16 +1226,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function SettingsCard({
     rows, onNavigate, onStartPiP, onToggleAutoNext,
-    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onLockScreen,
+    onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onToggleGpuNext, onLockScreen,
 }: {
     rows: Array<{
         label: string; value: string; panel: PlayerPanel; icon: React.ReactNode
-        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed"
+        accent?: string; action?: "pip" | "lock" | "toggle-auto-next" | "toggle-center-tap" | "toggle-side-swipe" | "toggle-auto-skip-op-ed" | "toggle-gpu-next"
     }>
     onNavigate: (p: PlayerPanel) => void
     onStartPiP?: () => void; onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void; onToggleSideSwipeControls?: () => void
     onToggleAutoSkipOpEd?: () => void
+    onToggleGpuNext?: () => void
     onLockScreen?: () => void
 }) {
     return (
@@ -1234,6 +1251,7 @@ function SettingsCard({
                         else if (row.action === "toggle-center-tap" && onToggleCenterTapPlayPause) onToggleCenterTapPlayPause()
                         else if (row.action === "toggle-side-swipe" && onToggleSideSwipeControls) onToggleSideSwipeControls()
                         else if (row.action === "toggle-auto-skip-op-ed" && onToggleAutoSkipOpEd) onToggleAutoSkipOpEd()
+                        else if (row.action === "toggle-gpu-next" && onToggleGpuNext) onToggleGpuNext()
                         else if (row.action === "lock" && onLockScreen) onLockScreen()
                         else onNavigate(row.panel)
                     }}

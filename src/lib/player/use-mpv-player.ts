@@ -539,11 +539,14 @@ export function useMpvPlayer() {
         }
     }, [handleNativeCommandError, onNativeTracksReady])
 
+    const gpuNext = getPlayerPreferences().useGpuNext
+
     return {
         // view integration
         viewRef,
         videoSource,
         nowPlayingMetadata,
+        gpuNext,
         onNativeLoad,
         onNativeProgress,
         onNativePlaybackStateChange,

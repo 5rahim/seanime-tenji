@@ -52,6 +52,12 @@ export type PlayerPreferences = {
      * Null means use the built-in mpv player.
      */
     externalPlayerTemplate: string | null
+    /**
+     * Use the gpu-next video output driver on Android (libplacebo-based).
+     * When disabled, falls back to the legacy vo=gpu renderer.
+     * Takes effect on the next video load. Default true.
+     */
+    useGpuNext: boolean
 }
 
 const DEFAULTS: PlayerPreferences = {
@@ -74,6 +80,7 @@ const DEFAULTS: PlayerPreferences = {
     autoSkipOpEd: false,
     wyzieApiKey: "",
     externalPlayerTemplate: null,
+    useGpuNext: true,
 }
 
 const STORAGE_KEY = "player-prefs"

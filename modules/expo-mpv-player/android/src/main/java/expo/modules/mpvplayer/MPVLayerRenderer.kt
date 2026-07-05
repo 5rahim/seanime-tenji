@@ -35,6 +35,10 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
 
     var delegate: Delegate? = null
 
+        // gpu-next toggle
+    @Volatile
+    private var useGpuNext: Boolean = true
+
     // cached state
     @Volatile
     var cachedPosition: Double = 0.0
@@ -82,10 +86,16 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
 
         MPVLib.create(context)
 
-        // video output
-        MPVLib.setOptionString("vo", "gpu")
-        MPVLib.setOptionString("gpu-context", "android")
-        MPVLib.setOptionString("opengl-es", "yes")
+        // video output — gpu-next (libplacebo) or legacy gpu
+        if (useGpuNext) {
+            MPVLib.setOptionString("vo", "gpu-next")
+            MPVLib.setOptionString("gpu-context", "android")
+            // opengl-es is not needed — gpu-next/libplacebo handles GL ES internally
+        } else {
+            MPVLib.setOptionString("vo", "gpu")
+            MPVLib.setOptionString("gpu-context", "android")
+            MPVLib.setOptionString("opengl-es", "yes")
+        }
 
         // hardware decoding
         MPVLib.setOptionString("hwdec", "mediacodec-copy")
@@ -153,6 +163,52 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
             Log.w(TAG, "Error during mpv stop", e)
         }
         Log.d(TAG, "mpv stopped")
+    }
+
+    /**
+     * Update the gpu-next preference and restart mpv with the new video output setting.
+     * The current video will be reloaded automatically.
+     */
+    fun setUseGpuNext(enabled: Boolean, currentUrl: String?, currentHeaders: Map<String, String>?) {
+        if (useGpuNext == enabled) return
+        useGpuNext = enabled
+        Log.i(TAG, "Switching vo: useGpuNext=$enabled")
+
+        // Tear down
+        if (initialized) {
+            initialized = false
+            MPVLib.removeObserver(this)
+            try {
+                MPVLib.command(arrayOf("stop"))
+                MPVLib.detachSurface()
+                MPVLib.destroy()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error during mpv restart teardown", e)
+            }
+        }
+
+        // Reinitialize with new options (start() calls MPVLib.create + init)
+        start()
+
+        // Re-attach surface if previously attached
+        val s = surface
+        if (s != null) {
+            MPVLib.attachSurface(s)
+            MPVLib.setPropertyString("force-window", "yes")
+        }
+
+        // Reload current video if one was playing
+        if (!currentUrl.isNullOrBlank()) {
+            val pos = cachedPosition
+            if (pos > 0) {
+                MPVLib.setPropertyString("start", formatMpvSeconds(pos))
+            }
+            if (!currentHeaders.isNullOrEmpty()) {
+                val headerStr = currentHeaders.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
+                MPVLib.setPropertyString("http-header-fields", headerStr)
+            }
+            MPVLib.command(arrayOf("loadfile", currentUrl, "replace"))
+        }
     }
 
     // -------------------------------------------------------------------

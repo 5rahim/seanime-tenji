@@ -42,6 +42,9 @@ public class ExpoMpvPlayerModule: Module {
         Function("setWindowBrightness") { (brightness: Double) in }
 
         View(MpvSurfaceExpoView.self) {
+            // gpu-next is Android-only (vo=avfoundation is required on iOS for PiP)
+            Prop("gpuNext") { (_: MpvSurfaceExpoView, _: Bool) in }
+
             // All video load options via a single "source" prop
             Prop("source") { (view: MpvSurfaceExpoView, source: [String: Any]?) in
                 guard let source = source,

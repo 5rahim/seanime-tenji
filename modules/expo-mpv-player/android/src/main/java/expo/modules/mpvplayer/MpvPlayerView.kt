@@ -50,6 +50,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     private var pipController: PiPController? = null
 
     private var currentUrl: String? = null
+    private var currentHeaders: Map<String, String>? = null
     private var cachedPosition: Double = 0.0
     private var cachedDuration: Double = 0.0
     private var intendedPlayState: Boolean = false
@@ -126,6 +127,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
 
+    fun setGpuNext(enabled: Boolean) {
+        renderer?.setUseGpuNext(enabled, currentUrl, currentHeaders)
+    }
+
     fun loadVideo(config: VideoLoadConfig) {
         if (config.url == currentUrl) return
 
@@ -139,6 +144,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     private fun loadVideoInternal(config: VideoLoadConfig) {
         currentUrl = config.url
+        currentHeaders = config.headers
         cachedPosition = 0.0
         cachedDuration = 0.0
         dispatchedPaused = null

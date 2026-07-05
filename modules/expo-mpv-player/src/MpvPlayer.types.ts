@@ -168,6 +168,7 @@ type NativeEvent<T> = { nativeEvent: T }
 export type MpvPlayerViewProps = ViewProps & {
     source?: MpvVideoSource
     nowPlayingMetadata?: NowPlayingMetadata
+    gpuNext?: boolean
     onLoad?: (event: NativeEvent<OnLoadEventPayload>) => void
     onProgress?: (event: NativeEvent<OnProgressEventPayload>) => void
     onPlaybackStateChange?: (event: NativeEvent<OnPlaybackStateChangePayload>) => void

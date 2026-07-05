@@ -915,6 +915,7 @@ function PlayerScreenInner() {
                         ref={player.viewRef}
                         source={player.videoSource}
                         nowPlayingMetadata={player.nowPlayingMetadata}
+                        gpuNext={player.gpuNext}
                         onLoad={player.onNativeLoad}
                         onProgress={player.onNativeProgress}
                         onPlaybackStateChange={player.onNativePlaybackStateChange}
@@ -1109,6 +1110,7 @@ function PlayerScreenInner() {
                         onToggleCenterTapPlayPause={() => updatePrefs({ centerTapPlayPause: !prefs.centerTapPlayPause })}
                         onToggleSideSwipeControls={() => updatePrefs({ sideSwipeBrightnessVolume: !prefs.sideSwipeBrightnessVolume })}
                         onToggleAutoSkipOpEd={() => updatePrefs({ autoSkipOpEd: !prefs.autoSkipOpEd })}
+                        onToggleGpuNext={() => updatePrefs({ useGpuNext: !prefs.useGpuNext })}
                         onLockScreen={controls.lockScreen}
                         episodes={source?.episodes}
                         currentEpisodeNumber={source?.episodeNumber}

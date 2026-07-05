@@ -75,7 +75,11 @@ class ExpoMpvPlayerModule : Module() {
             }
         }
 
-        View(MpvPlayerView::class) {
+            View(MpvPlayerView::class) {
+            Prop("gpuNext") { view: MpvPlayerView, enabled: Boolean ->
+                view.setGpuNext(enabled)
+            }
+
             Prop("source") { view: MpvPlayerView, source: Map<String, Any?>? ->
                 if (source == null) return@Prop
                 val url = source["url"] as? String ?: return@Prop
