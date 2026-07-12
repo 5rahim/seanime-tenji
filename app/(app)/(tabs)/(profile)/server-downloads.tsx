@@ -1,14 +1,16 @@
 import { useDebridCancelDownload, useDebridDeleteTorrent, useDebridDownloadTorrent, useDebridGetTorrents } from "@/api/hooks/debrid.hooks"
 import { useGetActiveTorrentList, useTorrentClientAction } from "@/api/hooks/torrent_client.hooks"
+import type { Debrid_TorrentItem, TorrentClient_Torrent } from "@/api/generated/types"
 import { useServerStatus } from "@/atoms/server.atoms"
 import { ProfileSubpageHeader } from "@/components/features/profile/profile-menu"
+import { getDownloadQueueViewState, shouldShowQueueRefreshWarning } from "@/components/features/profile/server-downloads-state"
 import { SegmentedControl } from "@/components/shared/segmented-control"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { useIsServerConnected } from "@/lib/offline"
 import { toast } from "@/lib/utils/toast"
 import { Ionicons } from "@expo/vector-icons"
 import * as React from "react"
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native"
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 type DownloadTab = "torrent" | "debrid"
@@ -18,34 +20,40 @@ export default function ServerDownloadsScreen() {
     const isConnected = useIsServerConnected()
     const serverStatus = useServerStatus()
     const [activeTab, setActiveTab] = React.useState<DownloadTab>("torrent")
+    const [isPullRefreshing, setIsPullRefreshing] = React.useState(false)
 
     useIOSScrollRefreshRateWorkaround()
 
-    const { data: rawTorrents, isLoading: isLoadingTorrents } = useGetActiveTorrentList(
+    const torrentQuery = useGetActiveTorrentList(
         isConnected && activeTab === "torrent",
         "",
         "",
     )
 
-    const { data: rawDebridTorrents, isLoading: isLoadingDebrid } = useDebridGetTorrents(
+    const debridQuery = useDebridGetTorrents(
         isConnected && activeTab === "debrid",
         3000,
     )
+
+    const rawTorrents = torrentQuery.data
+    const rawDebridTorrents = debridQuery.data
+    const refetchTorrents = torrentQuery.refetch
+    const refetchDebrid = debridQuery.refetch
 
     const torrents = React.useMemo(() => {
         return rawTorrents?.filter(t => {
             const isComplete = t.progress >= 1
             const isPausedOrStopped = t.status === "paused" || t.status === "stopped"
             return !(isComplete && isPausedOrStopped)
-        })
+        }) ?? []
     }, [rawTorrents])
 
     const debridTorrents = React.useMemo(() => {
-        return rawDebridTorrents?.filter((item: any) => {
+        return rawDebridTorrents?.filter(item => {
             const isComplete = item.completionPercentage >= 100
             const isPausedOrStopped = item.status?.toLowerCase() === "paused" || item.status?.toLowerCase() === "stopped"
             return !(isComplete && isPausedOrStopped)
-        })
+        }) ?? []
     }, [rawDebridTorrents])
 
     const { mutate: performTorrentAction } = useTorrentClientAction()
@@ -74,7 +82,7 @@ export default function ServerDownloadsScreen() {
         }
     }, [performTorrentAction])
 
-    const handleDebridDownload = React.useCallback((item: any) => {
+    const handleDebridDownload = React.useCallback((item: Debrid_TorrentItem) => {
         const libraryPath = serverStatus?.settings?.library?.libraryPath
         if (!libraryPath) {
             toast.error("Library path not configured on server settings")
@@ -83,11 +91,11 @@ export default function ServerDownloadsScreen() {
         downloadDebrid({ torrentItem: item, destination: libraryPath })
     }, [downloadDebrid, serverStatus?.settings?.library?.libraryPath])
 
-    const handleDebridCancel = React.useCallback((item: any) => {
+    const handleDebridCancel = React.useCallback((item: Debrid_TorrentItem) => {
         cancelDebridDownload({ itemID: item.id })
     }, [cancelDebridDownload])
 
-    const handleDebridDelete = React.useCallback((item: any) => {
+    const handleDebridDelete = React.useCallback((item: Debrid_TorrentItem) => {
         Alert.alert(
             "Delete debrid torrent?",
             `Are you sure you want to remove "${item.name}" from your debrid service?`,
@@ -117,8 +125,35 @@ export default function ServerDownloadsScreen() {
         )
     }
 
-    const isLoading = activeTab === "torrent" ? isLoadingTorrents : isLoadingDebrid
-    const isEmpty = activeTab === "torrent" ? !torrents || torrents.length === 0 : !debridTorrents || debridTorrents.length === 0
+    const activeQuery = activeTab === "torrent" ? torrentQuery : debridQuery
+    const activeItems = activeTab === "torrent" ? torrents : debridTorrents
+    const hasActiveData = activeTab === "torrent" ? Array.isArray(rawTorrents) : Array.isArray(rawDebridTorrents)
+    const viewState = getDownloadQueueViewState({
+        hasData: hasActiveData,
+        isError: activeQuery.isError,
+        isRefetchError: activeQuery.isRefetchError,
+        isSuccess: activeQuery.isSuccess,
+        itemCount: activeItems.length,
+    })
+    const showRefreshWarning = shouldShowQueueRefreshWarning(viewState, activeQuery.isRefetchError)
+    const errorMessage = activeQuery.error?.error || "The server download queue could not be loaded."
+
+    const handleRefresh = React.useCallback(() => {
+        setIsPullRefreshing(true)
+        const refreshPromise = activeTab === "torrent" ? refetchTorrents() : refetchDebrid()
+        void refreshPromise.finally(() => {
+            setIsPullRefreshing(false)
+        })
+    }, [activeTab, refetchDebrid, refetchTorrents])
+
+    const refreshControl = (
+        <RefreshControl
+            refreshing={isPullRefreshing}
+            onRefresh={handleRefresh}
+            tintColorClassName="accent-white/45"
+            colorsClassName="accent-brand-500"
+        />
+    )
 
     return (
         <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -138,40 +173,106 @@ export default function ServerDownloadsScreen() {
                 />
             </View>
 
-            {isLoading ? (
+            {viewState === "loading" ? (
                 <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="white" />
-                </View>
-            ) : isEmpty ? (
-                <View className="flex-1 items-center justify-center px-6 gap-3">
-                    <Ionicons name="cloud-download-outline" size={48} color="rgba(255,255,255,0.15)" />
-                    <Text className="text-white/40 text-sm font-medium text-center">No active server downloads found</Text>
+                    <ActivityIndicator size="large" colorClassName="accent-white" />
                 </View>
             ) : (
                 <ScrollView
                     className="flex-1"
-                    contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40 }}
+                    contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 40, flexGrow: 1 }}
+                    refreshControl={refreshControl}
                     showsVerticalScrollIndicator={false}
                 >
-                    {activeTab === "torrent" && torrents?.map((torrent) => (
-                        <TorrentRow
-                            key={torrent.hash}
-                            torrent={torrent}
-                            onAction={(action) => handleTorrentAction(torrent.hash, torrent.name, action)}
-                        />
-                    ))}
+                    {viewState === "error" ? (
+                        <QueueErrorState message={errorMessage} onRetry={handleRefresh} isRetrying={isPullRefreshing} />
+                    ) : viewState === "empty" ? (
+                        <QueueEmptyState />
+                    ) : (
+                        <>
+                            {showRefreshWarning && (
+                                <QueueRefreshWarning onRetry={handleRefresh} isRetrying={isPullRefreshing} />
+                            )}
 
-                    {activeTab === "debrid" && debridTorrents?.map((item) => (
-                        <DebridRow
-                            key={item.id}
-                            item={item}
-                            onDownload={() => handleDebridDownload(item)}
-                            onCancel={() => handleDebridCancel(item)}
-                            onDelete={() => handleDebridDelete(item)}
-                        />
-                    ))}
+                            {activeTab === "torrent" && torrents.map(torrent => (
+                                <TorrentRow
+                                    key={torrent.hash}
+                                    torrent={torrent}
+                                    onAction={(action) => handleTorrentAction(torrent.hash, torrent.name, action)}
+                                />
+                            ))}
+
+                            {activeTab === "debrid" && debridTorrents.map(item => (
+                                <DebridRow
+                                    key={item.id}
+                                    item={item}
+                                    onDownload={() => handleDebridDownload(item)}
+                                    onCancel={() => handleDebridCancel(item)}
+                                    onDelete={() => handleDebridDelete(item)}
+                                />
+                            ))}
+                        </>
+                    )}
                 </ScrollView>
             )}
+        </View>
+    )
+}
+
+function QueueEmptyState() {
+    return (
+        <View className="flex-1 items-center justify-center px-6 gap-3">
+            <Ionicons name="cloud-download-outline" size={48} color="rgba(255,255,255,0.15)" />
+            <Text className="text-sm font-medium text-white/40 text-center">No active server downloads found</Text>
+            <Text className="text-xs text-white/25 text-center">Pull down to check again.</Text>
+        </View>
+    )
+}
+
+function QueueErrorState({ message, onRetry, isRetrying }: { message: string; onRetry: () => void; isRetrying: boolean }) {
+    return (
+        <View className="flex-1 items-center justify-center px-6 gap-3">
+            <View className="size-12 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10">
+                <Ionicons name="cloud-offline-outline" size={24} color="rgb(248 113 113)" />
+            </View>
+            <Text className="text-base font-semibold text-white text-center">Couldn&apos;t load server downloads</Text>
+            <Text className="text-sm leading-5 text-white/40 text-center" numberOfLines={3}>{message}</Text>
+            <Pressable
+                onPress={onRetry}
+                disabled={isRetrying}
+                className="mt-1 min-h-11 flex-row items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 active:bg-white/10 disabled:opacity-50"
+            >
+                {isRetrying ? (
+                    <ActivityIndicator size="small" colorClassName="accent-white" />
+                ) : (
+                    <Ionicons name="refresh-outline" size={16} color="white" />
+                )}
+                <Text className="text-sm font-semibold text-white">Retry</Text>
+            </Pressable>
+        </View>
+    )
+}
+
+function QueueRefreshWarning({ onRetry, isRetrying }: { onRetry: () => void; isRetrying: boolean }) {
+    return (
+        <View className="mb-3 flex-row items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">
+            <Ionicons name="warning-outline" size={18} color="rgb(251 191 36)" />
+            <View className="flex-1 gap-0.5">
+                <Text className="text-xs font-semibold text-amber-200">Unable to refresh</Text>
+                <Text className="text-xs text-white/40">Showing the last server response.</Text>
+            </View>
+            <Pressable
+                onPress={onRetry}
+                disabled={isRetrying}
+                hitSlop={8}
+                className="min-h-9 min-w-14 items-center justify-center rounded-lg bg-amber-500/10 px-2 active:bg-amber-500/20 disabled:opacity-50"
+            >
+                {isRetrying ? (
+                    <ActivityIndicator size="small" colorClassName="accent-amber-300" />
+                ) : (
+                    <Text className="text-xs font-semibold text-amber-300">Retry</Text>
+                )}
+            </Pressable>
         </View>
     )
 }
@@ -199,8 +300,12 @@ function StatusBadge({ status }: { status: string }) {
             bgClass = "bg-amber-500/15 border"
             textClass = "text-amber-400"
             break
+        case "queued":
+            bgClass = "bg-violet-500/15 border border-violet-500/20"
+            textClass = "text-violet-300"
+            break
         case "error":
-            bgClass = "bg-red-500/15 border"
+            bgClass = "bg-red-500/15 border border-red-500/20"
             textClass = "text-red-400"
             break
         case "stalled":
@@ -216,9 +321,9 @@ function StatusBadge({ status }: { status: string }) {
     )
 }
 
-function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "pause" | "resume" | "remove") => void }) {
-    const progressPercent = Math.round((torrent.progress || 0) * 100)
-    const isPaused = torrent.status === "paused" || torrent.status === "stopped"
+function TorrentRow({ torrent, onAction }: { torrent: TorrentClient_Torrent; onAction: (action: "pause" | "resume" | "remove") => void }) {
+    const progressPercent = Math.max(0, Math.min(100, Math.round((torrent.progress || 0) * 100)))
+    const canResume = torrent.status === "paused" || torrent.status === "stopped" || torrent.status === "error"
 
     return (
         <View className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 mb-3 gap-2">
@@ -228,6 +333,10 @@ function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "p
                 </Text>
                 <StatusBadge status={torrent.status} />
             </View>
+
+            {torrent.status === "error" && !!torrent.error && (
+                <Text className="text-xs text-red-300/80" numberOfLines={2}>{torrent.error}</Text>
+            )}
 
             <View className="flex-row items-center justify-between">
                 <Text className="text-xs text-white/40">{torrent.size}</Text>
@@ -256,11 +365,11 @@ function TorrentRow({ torrent, onAction }: { torrent: any; onAction: (action: "p
 
             <View className="flex-row justify-end gap-2 mt-2">
                 <Pressable
-                    onPress={() => onAction(isPaused ? "resume" : "pause")}
+                    onPress={() => onAction(canResume ? "resume" : "pause")}
                     className="flex-row items-center bg-white/5 active:bg-white/10 px-3 py-1.5 rounded-lg gap-1 border border-white/5"
                 >
-                    <Ionicons name={isPaused ? "play-outline" : "pause-outline"} size={14} color="white" />
-                    <Text className="text-white text-xs font-medium">{isPaused ? "Resume" : "Pause"}</Text>
+                    <Ionicons name={canResume ? "play-outline" : "pause-outline"} size={14} color="white" />
+                    <Text className="text-white text-xs font-medium">{canResume ? "Resume" : "Pause"}</Text>
                 </Pressable>
                 <Pressable
                     onPress={() => onAction("remove")}
@@ -280,7 +389,7 @@ function DebridRow({
     onCancel,
     onDelete,
 }: {
-    item: any
+    item: Debrid_TorrentItem
     onDownload: () => void
     onCancel: () => void
     onDelete: () => void

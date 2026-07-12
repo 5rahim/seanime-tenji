@@ -25,6 +25,7 @@ import type {
     Models_AnilistSettings,
     Models_DebridSettings,
     Models_DiscordSettings,
+    Models_DummyDebridSettings,
     Models_HomeItem,
     Models_LibrarySettings,
     Models_MangaSettings,
@@ -122,6 +123,7 @@ export type AnilistListAnime_Variables = {
     sort?: Array<AL_MediaSort>
     status?: Array<AL_MediaStatus>
     genres?: Array<string>
+    tags?: Array<string>
     averageScore_greater?: number
     season?: AL_MediaSeason
     seasonYear?: number
@@ -507,6 +509,17 @@ export type SaveDebridSettings_Variables = {
 /**
  * - Filepath: internal/handlers/debrid.go
  * - Filename: debrid.go
+ * - Endpoint: /api/v1/debrid/dummy/settings
+ * @description
+ * Route save dummy debrid settings.
+ */
+export type SaveDummyDebridSettings_Variables = {
+    settings: Models_DummyDebridSettings
+}
+
+/**
+ * - Filepath: internal/handlers/debrid.go
+ * - Filename: debrid.go
  * - Endpoint: /api/v1/debrid/torrents
  * @description
  * Route add torrent to debrid.
@@ -852,6 +865,18 @@ export type ReloadExternalExtension_Variables = {
 /**
  * - Filepath: internal/handlers/extensions.go
  * - Filename: extensions.go
+ * - Endpoint: /api/v1/extensions/external/disabled
+ * @description
+ * Route enables or disables an external extension.
+ */
+export type SetExternalExtensionDisabled_Variables = {
+    id: string
+    disabled: boolean
+}
+
+/**
+ * - Filepath: internal/handlers/extensions.go
+ * - Filename: extensions.go
  * - Endpoint: /api/v1/extensions/all
  * @description
  * Route returns all loaded and invalid extensions.
@@ -1003,6 +1028,10 @@ export type LocalGetIsMediaTracked_Variables = {
 export type LocalSetHasLocalChanges_Variables = {
     updated: boolean
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// local_security
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // localfiles
@@ -1228,6 +1257,7 @@ export type AnilistListManga_Variables = {
     sort?: Array<AL_MediaSort>
     status?: Array<AL_MediaStatus>
     genres?: Array<string>
+    tags?: Array<string>
     averageScore_greater?: number
     year?: number
     countryOfOrigin?: string
@@ -1451,6 +1481,24 @@ export type SaveMediaMetadataParent_Variables = {
  */
 export type DeleteMediaMetadataParent_Variables = {
     mediaId: number
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// mpvcore
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * - Filepath: internal/handlers/mpvcore.go
+ * - Filename: mpvcore.go
+ * - Endpoint: /api/v1/mpvcore/insight/character/{malId}
+ * @description
+ * Route returns the character details for MpvCore InSight.
+ */
+export type MpvCoreInSightGetCharacterDetails_Variables = {
+    /**
+     *  The MAL character ID
+     */
+    malId: number
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1711,10 +1759,6 @@ export type GetPlaylistEpisodes_Variables = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// proxy
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // releases
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1755,6 +1799,10 @@ export type SaveIssueReport_Variables = {
     viewportHeight: number
     recordingDurationMs: number
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// request_boundary
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // scan
@@ -1825,6 +1873,18 @@ export type SaveSettings_Variables = {
 /**
  * - Filepath: internal/handlers/settings.go
  * - Filename: settings.go
+ * - Endpoint: /api/v1/settings/path
+ * @description
+ * Route patches a specific app setting.
+ */
+export type PatchSetting_Variables = {
+    path: string
+    value: any
+}
+
+/**
+ * - Filepath: internal/handlers/settings.go
+ * - Filename: settings.go
  * - Endpoint: /api/v1/settings/auto-downloader
  * @description
  * Route updates the auto-downloader settings.
@@ -1888,6 +1948,10 @@ export type UpdateHomeItems_Variables = {
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// strict_security
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // theme
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1914,9 +1978,17 @@ export type UpdateTheme_Variables = {
  * Route performs an action on a torrent.
  */
 export type TorrentClientAction_Variables = {
-    hash: string
+    hash?: string
     action: string
-    dir: string
+    dir?: string
+    tracker?: string
+    name?: string
+    value?: boolean
+    index?: number
+    priority?: number
+    downloadLimit?: number
+    uploadLimit?: number
+    magnet?: string
 }
 
 /**
@@ -2063,6 +2135,17 @@ export type GetTorrentstreamBatchHistory_Variables = {
     mediaId: number
 }
 
+/**
+ * - Filepath: internal/handlers/torrentstream.go
+ * - Filename: torrentstream.go
+ * - Endpoint: /api/v1/torrentstream/batch-history/delete
+ * @description
+ * Route deletes the saved batch selection.
+ */
+export type DeleteTorrentstreamBatchHistory_Variables = {
+    mediaId: number
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // videocore
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2079,6 +2162,19 @@ export type VideoCoreInSightGetCharacterDetails_Variables = {
      *  The MAL character ID
      */
     malId: number
+}
+
+/**
+ * - Filepath: internal/handlers/videocore.go
+ * - Filename: videocore.go
+ * - Endpoint: /api/v1/videocore/screenshot
+ * @description
+ * Route saves a screenshot to a local directory.
+ */
+export type VideoCoreSaveScreenshot_Variables = {
+    dir: string
+    filename: string
+    base64Data: string
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

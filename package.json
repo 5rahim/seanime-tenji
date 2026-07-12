@@ -21,6 +21,7 @@
     "internal:release:github": "bash ./scripts/publish-github-release.sh --platform all",
     "internal:ota:publish": "node ./tools/publish-ota-update.mjs",
     "internal:bump-version": "node ./tools/bump-version.mjs",
+    "test:server-downloads": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/components/features/profile/server-downloads-state.test.mjs",
     "fix": "npx expo install --fix",
     "ios": "EXPO_OFFLINE=1 expo start -c --ios",
     "clean": "rm -rf .expo node_modules"
