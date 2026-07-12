@@ -12,6 +12,7 @@ import { Surface } from "@/components/shared/surface"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { useIsServerConnected } from "@/lib/offline"
+import { getMediaGridLayout } from "@/lib/responsive-card-layout"
 import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { addDays, addWeeks, format, isSameDay, setMonth, setYear, startOfWeek, subWeeks } from "date-fns"
@@ -19,15 +20,12 @@ import { router } from "expo-router"
 import { useAtom } from "jotai/react"
 import sortBy from "lodash/sortBy"
 import * as React from "react"
-import { ActivityIndicator, Dimensions, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const NUM_COLUMNS = 3
 const GRID_SPACING = 10
 const GRID_PADDING = 14
-const CARD_WIDTH = (SCREEN_WIDTH - (NUM_COLUMNS - 1) * GRID_SPACING - 2 * GRID_PADDING) / NUM_COLUMNS
-const ROW_HEIGHT = CARD_WIDTH * 1.5 + GRID_SPACING
 
 export default function ScheduleScreen() {
     const isConnected = useIsServerConnected()
@@ -306,29 +304,43 @@ function ScheduleGrid({
     settings: ScheduleSettings
     refreshControl: React.ReactElement<React.ComponentProps<typeof RefreshControl>> | undefined
 }) {
+    const { width: screenWidth } = useWindowDimensions()
+    const insets = useSafeAreaInsets()
+    const usableWidth = Math.max(1, screenWidth - insets.left - insets.right)
+    const { cardWidth, numColumns } = React.useMemo(
+        () => getMediaGridLayout({
+            screenWidth: usableWidth,
+            horizontalPadding: GRID_PADDING,
+            spacing: GRID_SPACING,
+        }),
+        [usableWidth],
+    )
+    const rowHeight = React.useMemo(() => cardWidth * 1.5 + GRID_SPACING, [cardWidth])
+
     const getItemLayout = React.useCallback((_: ArrayLike<ScheduleEvent> | null | undefined, index: number) => {
-        const rowIndex = Math.floor(index / NUM_COLUMNS)
+        const rowIndex = Math.floor(index / numColumns)
 
         return {
-            length: ROW_HEIGHT,
-            offset: 8 + (rowIndex * ROW_HEIGHT),
+            length: rowHeight,
+            offset: 8 + (rowIndex * rowHeight),
             index,
         }
-    }, [])
+    }, [numColumns, rowHeight])
 
     return (
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
             <FlatList
+                key={`schedule-grid-${numColumns}`}
                 data={events}
-                numColumns={NUM_COLUMNS}
+                numColumns={numColumns}
                 showsVerticalScrollIndicator={false}
                 keyExtractor={(item) => `${item.mediaId}-${item.episodeNumber}-${item.dateTime}`}
                 renderItem={({ item }) => (
-                    <ScheduleCardWrapper item={item} settings={settings} />
+                    <ScheduleCardWrapper item={item} settings={settings} cardWidth={cardWidth} />
                 )}
                 getItemLayout={getItemLayout}
-                initialNumToRender={NUM_COLUMNS * 3}
-                maxToRenderPerBatch={NUM_COLUMNS * 2}
+                initialNumToRender={numColumns * 3}
+                maxToRenderPerBatch={numColumns * 2}
                 updateCellsBatchingPeriod={16}
                 windowSize={7}
                 removeClippedSubviews
@@ -349,9 +361,11 @@ function ScheduleGrid({
 function ScheduleCardWrapper({
     item,
     settings,
+    cardWidth,
 }: {
     item: ScheduleEvent
     settings: ScheduleSettings
+    cardWidth: number
 }) {
     const media: AL_BaseAnime = React.useMemo(() => ({
         id: item.mediaId,
@@ -367,16 +381,16 @@ function ScheduleCardWrapper({
     const isWatchedAndDimmed = item.isWatched && settings.indicateWatchedEpisodes
 
     return (
-        <View style={{ width: CARD_WIDTH, opacity: isWatchedAndDimmed ? 0.45 : 1 }}>
+        <View style={{ width: cardWidth, opacity: isWatchedAndDimmed ? 0.45 : 1 }}>
             <MediaEntryCard
                 type="anime"
                 media={media}
-                cardWidth={CARD_WIDTH}
+                cardWidth={cardWidth}
                 hideProgress
                 preferFetchedSheetMedia
                 hideLibraryBadge
                 onPress={() => router.push(`/(app)/entry/anime/${item.mediaId}`)}
-                overlay={<View className="absolute top-0 left-0 right-0 z-10" style={{ height: CARD_WIDTH * 1.275 }} pointerEvents="none">
+                overlay={<View className="absolute top-0 left-0 right-0 z-10" style={{ height: cardWidth * 1.275 }} pointerEvents="none">
                     <View className="absolute top-1.5 left-1.5 flex-row items-center gap-1">
                         <View className="bg-black/70 rounded px-1.5 py-0.5">
                             <Text className="text-[11px] font-bold text-gray-200">

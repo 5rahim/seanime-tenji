@@ -27,20 +27,18 @@ import { COLORS } from "@/constants/colors"
 import { useDevScreenProfiler } from "@/hooks/use-dev-screen-profiler"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { useIsServerConnected } from "@/lib/offline"
+import { getHorizontalMediaCardRowHeight, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { SEARCH_MEDIA_GENRES } from "@/lib/search/search-constants"
 import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { useIsFocused } from "@react-navigation/native"
 import { router } from "expo-router"
 import * as React from "react"
-import { ActivityIndicator, Dimensions, Pressable, Text, View, ViewToken } from "react-native"
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View, ViewToken } from "react-native"
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 
 type DiscoverMode = "anime" | "manga"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const DISCOVER_CARD_WIDTH = (2 / 5) * SCREEN_WIDTH
-const DISCOVER_CARD_ROW_HEIGHT = DISCOVER_CARD_WIDTH * 1.5 + 16
 const DISCOVER_SECTION_HEADER_HEIGHT = 56
 const DISCOVER_ANIME_SECTION_ITEMS = [
     { key: "trending" },
@@ -302,6 +300,11 @@ function DiscoverListHeader({
 }
 
 function DiscoverSectionSkeleton({ title }: { title: string }) {
+    const { width: screenWidth } = useWindowDimensions()
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const cardRowHeight = React.useMemo(() => getHorizontalMediaCardRowHeight(cardWidth), [cardWidth])
+    const skeletonCount = React.useMemo(() => Math.min(6, Math.ceil(screenWidth / (cardWidth + 10))), [cardWidth, screenWidth])
+
     return (
         <View className="flex flex-col gap-4">
             <View
@@ -312,17 +315,17 @@ function DiscoverSectionSkeleton({ title }: { title: string }) {
                 <Skeleton className="h-8 w-8 rounded-full bg-white/10" />
             </View>
 
-            <View style={{ height: DISCOVER_CARD_ROW_HEIGHT }}>
+            <View style={{ height: cardRowHeight }}>
                 <View className="flex-row px-5" style={{ gap: 10 }}>
-                    {Array.from({ length: 3 }, (_, index) => (
-                        <View key={`${title}-${index}`} style={{ width: DISCOVER_CARD_WIDTH }} className="gap-3">
-                            <View style={{ width: DISCOVER_CARD_WIDTH, height: DISCOVER_CARD_WIDTH * 1.5 }}>
+                    {Array.from({ length: skeletonCount }, (_, index) => (
+                        <View key={`${title}-${index}`} style={{ width: cardWidth }} className="gap-3">
+                            <View style={{ width: cardWidth, height: cardWidth * 1.5 }}>
                                 <Skeleton className="h-full w-full rounded-xl bg-white/10" />
                             </View>
-                            <View style={{ width: DISCOVER_CARD_WIDTH * 0.82, height: 12 }}>
+                            <View style={{ width: cardWidth * 0.82, height: 12 }}>
                                 <Skeleton className="h-full w-full rounded-full bg-white/10" />
                             </View>
-                            <View style={{ width: DISCOVER_CARD_WIDTH * 0.56, height: 12 }}>
+                            <View style={{ width: cardWidth * 0.56, height: 12 }}>
                                 <Skeleton className="h-full w-full rounded-full bg-white/10" />
                             </View>
                         </View>

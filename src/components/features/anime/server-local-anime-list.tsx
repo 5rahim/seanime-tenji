@@ -1,17 +1,15 @@
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
 import { Animations } from "@/components/shared/animations"
 import { getServerLocalEpisodeCount, parseServerLocalAnimeEntry, type ServerLocalAnimeRecord, useServerLocalAnimeRecords } from "@/lib/offline"
+import { getHorizontalCardRenderCount, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { Ionicons } from "@expo/vector-icons"
 import { router } from "expo-router"
 import React from "react"
-import { Dimensions, FlatList, ListRenderItemInfo, Text, View } from "react-native"
+import { FlatList, ListRenderItemInfo, Text, useWindowDimensions, View } from "react-native"
 import Animated from "react-native-reanimated"
 
-const { width } = Dimensions.get("screen")
-const CARD_WIDTH = (2 / 5) * width
 const SPACING = 10
 const PADDING_HORIZONTAL = 20
-const INITIAL_RENDER_COUNT = 4
 
 function ServerEpisodeCountOverlay({ count }: { count: number }) {
     return (
@@ -26,6 +24,15 @@ function ServerEpisodeCountOverlay({ count }: { count: number }) {
 
 export function ServerLocalAnimeList() {
     const records = useServerLocalAnimeRecords()
+    const { width: screenWidth } = useWindowDimensions()
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const itemFullWidth = cardWidth + SPACING
+    const initialRenderCount = React.useMemo(() => getHorizontalCardRenderCount({
+        viewportWidth: screenWidth,
+        cardWidth,
+        spacing: SPACING,
+        horizontalPadding: PADDING_HORIZONTAL,
+    }), [cardWidth, screenWidth])
 
     const visibleRecords = React.useMemo(
         () => records.filter(record => !!parseServerLocalAnimeEntry(record)?.media),
@@ -34,10 +41,10 @@ export function ServerLocalAnimeList() {
 
     const keyExtractor = React.useCallback((item: ServerLocalAnimeRecord) => String(item.mediaId), [])
     const getItemLayout = React.useCallback((_: ArrayLike<ServerLocalAnimeRecord> | null | undefined, index: number) => ({
-        length: CARD_WIDTH + SPACING,
-        offset: (CARD_WIDTH + SPACING) * index,
+        length: itemFullWidth,
+        offset: itemFullWidth * index,
         index,
-    }), [])
+    }), [itemFullWidth])
 
     const renderItem = React.useCallback(({ item }: ListRenderItemInfo<ServerLocalAnimeRecord>) => {
         const entry = parseServerLocalAnimeEntry(item)
@@ -48,7 +55,7 @@ export function ServerLocalAnimeList() {
                 type="anime"
                 media={entry.media}
                 listData={entry.listData}
-                cardWidth={CARD_WIDTH}
+                cardWidth={cardWidth}
                 hideLibraryBadge
                 overlay={<ServerEpisodeCountOverlay count={getServerLocalEpisodeCount(item)} />}
                 onPress={() => {
@@ -59,7 +66,7 @@ export function ServerLocalAnimeList() {
                 }}
             />
         )
-    }, [])
+    }, [cardWidth])
 
     if (visibleRecords.length === 0) return null
 
@@ -82,9 +89,10 @@ export function ServerLocalAnimeList() {
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
+                extraData={cardWidth}
                 getItemLayout={getItemLayout}
-                initialNumToRender={Math.min(visibleRecords.length, INITIAL_RENDER_COUNT)}
-                maxToRenderPerBatch={INITIAL_RENDER_COUNT}
+                initialNumToRender={Math.min(visibleRecords.length, initialRenderCount)}
+                maxToRenderPerBatch={initialRenderCount}
                 windowSize={5}
                 removeClippedSubviews
                 contentContainerStyle={{ paddingHorizontal: PADDING_HORIZONTAL, gap: SPACING }}

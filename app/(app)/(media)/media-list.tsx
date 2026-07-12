@@ -6,23 +6,31 @@ import { Button } from "@/components/ui/button"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import { buildMediaEntryHref, getMediaEntryKind } from "@/lib/media-entry-route"
+import { getMediaGridLayout } from "@/lib/responsive-card-layout"
 import { FlashList } from "@shopify/flash-list"
 import { router } from "expo-router"
 import { useAtom } from "jotai/react"
 import React from "react"
-import { Dimensions, Text, View } from "react-native"
+import { Text, useWindowDimensions, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-const { width } = Dimensions.get("screen")
-const NUM_COLUMNS = 3
 const SPACING = 10
 const PADDING_HORIZONTAL = 8
-const AVAILABLE_SPACE = width - (NUM_COLUMNS - 1) * SPACING - 2 * PADDING_HORIZONTAL
-
-const CARD_WIDTH = AVAILABLE_SPACE / NUM_COLUMNS
 
 
 export default function MediaList() {
     const canGoBack = router.canGoBack()
+    const { width: screenWidth } = useWindowDimensions()
+    const insets = useSafeAreaInsets()
+    const usableWidth = Math.max(1, screenWidth - insets.left - insets.right)
+    const { cardWidth, numColumns } = React.useMemo(
+        () => getMediaGridLayout({
+            screenWidth: usableWidth,
+            horizontalPadding: PADDING_HORIZONTAL,
+            spacing: SPACING,
+        }),
+        [usableWidth],
+    )
 
     useIOSScrollRefreshRateWorkaround()
 
@@ -38,7 +46,7 @@ export default function MediaList() {
         if (itemType === "manga") {
             return <MediaEntryCard
                 type="manga"
-                cardWidth={CARD_WIDTH}
+                cardWidth={cardWidth}
                 media={item as AL_BaseManga}
                 onPress={() => router.push(buildMediaEntryHref(item, mediaListPageContent.type))}
             />
@@ -46,11 +54,11 @@ export default function MediaList() {
 
         return <MediaEntryCard
             type="anime"
-            cardWidth={CARD_WIDTH}
+            cardWidth={cardWidth}
             media={item as AL_BaseAnime}
             onPress={() => router.push(buildMediaEntryHref(item, mediaListPageContent.type))}
         />
-    }, [mediaListPageContent.type])
+    }, [cardWidth, mediaListPageContent.type])
 
     return (
         <SafeView>
@@ -70,8 +78,9 @@ export default function MediaList() {
                 className="flex-1"
             >
                 <FlashList
+                    key={`media-list-${numColumns}`}
                     data={mediaListPageContent?.media}
-                    numColumns={NUM_COLUMNS}
+                    numColumns={numColumns}
                     showsVerticalScrollIndicator={false}
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}

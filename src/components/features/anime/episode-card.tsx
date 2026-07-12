@@ -1,9 +1,7 @@
 import { SeaImage } from "@/components/shared/sea-image"
+import { getEpisodeCardWidth } from "@/lib/responsive-card-layout"
 import * as React from "react"
-import { Dimensions, Pressable, Text, View } from "react-native"
-
-const { width } = Dimensions.get("screen")
-const CARD_WIDTH = (3 / 4) * width
+import { Pressable, Text, useWindowDimensions, View } from "react-native"
 
 type EpisodeCardProps = {
     cardWidth?: number
@@ -22,7 +20,7 @@ type EpisodeCardProps = {
 
 export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardProps) {
     const {
-        cardWidth = CARD_WIDTH,
+        cardWidth,
         image,
         imageBlurred,
         title,
@@ -35,13 +33,15 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
         thumbnailOverlay,
         animeTitle,
     } = props
+    const { width: screenWidth } = useWindowDimensions()
+    const resolvedCardWidth = cardWidth ?? getEpisodeCardWidth(screenWidth)
 
     return (
         <Pressable
             onPress={disabled ? undefined : onPress}
             disabled={disabled || !onPress}
         >
-            <View style={{ width: cardWidth }}>
+            <View style={{ width: resolvedCardWidth }}>
                 <View className="relative mb-2" style={{ borderRadius: 12, overflow: "hidden" }}>
                     <SeaImage
                         source={{ uri: image }}

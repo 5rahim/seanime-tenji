@@ -1,17 +1,15 @@
 import { AL_BaseAnime, AL_BaseManga } from "@/api/generated/types"
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
 import { Animations } from "@/components/shared/animations"
+import { getHorizontalCardRenderCount, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { Ionicons } from "@expo/vector-icons"
 import { router } from "expo-router"
 import React from "react"
-import { Dimensions, FlatList, ListRenderItemInfo, Text, View } from "react-native"
+import { FlatList, ListRenderItemInfo, Text, useWindowDimensions, View } from "react-native"
 import Animated from "react-native-reanimated"
 
-const { width } = Dimensions.get("screen")
-const CARD_WIDTH = (2 / 5) * width
 const SPACING = 10
 const PADDING_HORIZONTAL = 20
-const INITIAL_DOWNLOAD_RENDER = 4
 
 type DownloadedMediaShelfItem = {
     mediaId: number
@@ -67,15 +65,25 @@ function DownloadCountOverlay({ count }: { count: number }) {
 }
 
 export function DownloadedMediaShelf<T extends "anime" | "manga">({ type, items }: DownloadedMediaShelfProps<T>) {
+    const { width: screenWidth } = useWindowDimensions()
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const itemFullWidth = cardWidth + SPACING
+    const initialRenderCount = React.useMemo(() => getHorizontalCardRenderCount({
+        viewportWidth: screenWidth,
+        cardWidth,
+        spacing: SPACING,
+        horizontalPadding: PADDING_HORIZONTAL,
+    }), [cardWidth, screenWidth])
+
     if (items.length === 0) return null
 
     const keyExtractor = React.useCallback((item: DownloadedMediaShelfItem) => String(item.mediaId), [])
 
     const getItemLayout = React.useCallback((_: ArrayLike<DownloadedMediaShelfItem> | null | undefined, index: number) => ({
-        length: CARD_WIDTH + SPACING,
-        offset: (CARD_WIDTH + SPACING) * index,
+        length: itemFullWidth,
+        offset: itemFullWidth * index,
         index,
-    }), [])
+    }), [itemFullWidth])
 
     const renderItem = React.useCallback(({ item }: ListRenderItemInfo<DownloadedMediaShelfItem>) => {
         const media = type === "anime"
@@ -86,7 +94,7 @@ export function DownloadedMediaShelf<T extends "anime" | "manga">({ type, items 
             <MediaEntryCard
                 type={type}
                 media={media}
-                cardWidth={CARD_WIDTH}
+                cardWidth={cardWidth}
                 hideProgress
                 overlay={<DownloadCountOverlay count={item.downloadedCount} />}
                 onPress={() => {
@@ -97,7 +105,7 @@ export function DownloadedMediaShelf<T extends "anime" | "manga">({ type, items 
                 }}
             />
         )
-    }, [type])
+    }, [cardWidth, type])
 
     return (
         <Animated.View
@@ -118,9 +126,10 @@ export function DownloadedMediaShelf<T extends "anime" | "manga">({ type, items 
                 showsHorizontalScrollIndicator={false}
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
+                extraData={cardWidth}
                 getItemLayout={getItemLayout}
-                initialNumToRender={Math.min(items.length, INITIAL_DOWNLOAD_RENDER)}
-                maxToRenderPerBatch={INITIAL_DOWNLOAD_RENDER}
+                initialNumToRender={Math.min(items.length, initialRenderCount)}
+                maxToRenderPerBatch={initialRenderCount}
                 windowSize={5}
                 removeClippedSubviews
                 contentContainerStyle={{ paddingHorizontal: PADDING_HORIZONTAL, gap: SPACING }}

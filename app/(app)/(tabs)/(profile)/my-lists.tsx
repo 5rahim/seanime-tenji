@@ -17,21 +17,19 @@ import { InlineSelect } from "@/components/shared/inline-select"
 import { LibrarySearchBar } from "@/components/shared/library-search-bar"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
 import { useIsServerConnected } from "@/lib/offline"
+import { getMediaGridLayout } from "@/lib/responsive-card-layout"
 import { cn } from "@/lib/utils"
 import { CollectionParams, DEFAULT_COLLECTION_PARAMS, filterEntriesByTitle, filterListEntries } from "@/lib/utils/filtering"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { router } from "expo-router"
 import * as React from "react"
-import { ActivityIndicator, Dimensions, FlatList, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, Text, useWindowDimensions, View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 import Animated, { FadeIn } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const NUM_COLUMNS = 3
 const H_PADDING = 14
 const GAP = 10
-const CARD_WIDTH = (SCREEN_WIDTH - (NUM_COLUMNS - 1) * GAP - 2 * H_PADDING) / NUM_COLUMNS
 const INITIAL_MY_LIST_ROWS = 5
 
 type CollectionGridCardData = {
@@ -126,8 +124,7 @@ function toIsoDate(date?: { year?: number | null; month?: number | null; day?: n
 /**
  * Builds SectionList-compatible sections from the raw collection.
  * Each section represents a status group (or named custom list). Entries
- * within each section are filtered, sorted, and chunked into rows of
- * NUM_COLUMNS for grid layout.
+ * within each section are filtered, sorted, and chunked into grid rows.
  */
 function buildSections(
     lists: (AL_AnimeCollection_MediaListCollection_Lists | AL_MangaCollection_MediaListCollection_Lists)[] | undefined,
@@ -136,6 +133,7 @@ function buildSections(
     params: CollectionParams,
     showAdult: boolean | undefined,
     type: "anime" | "manga",
+    numColumns: number,
 ): SectionData[] {
     if (!lists) return []
 
@@ -168,8 +166,8 @@ function buildSections(
         if (preparedEntries.length === 0) return
         // chunk into rows for grid rendering
         const rows: CollectionGridCardData[][] = []
-        for (let i = 0; i < preparedEntries.length; i += NUM_COLUMNS) {
-            rows.push(preparedEntries.slice(i, i + NUM_COLUMNS))
+        for (let i = 0; i < preparedEntries.length; i += numColumns) {
+            rows.push(preparedEntries.slice(i, i + numColumns))
         }
         sections.push({ title: label, count: preparedEntries.length, data: rows })
     }
@@ -243,10 +241,14 @@ const CollectionGridRow = React.memo(function CollectionGridRow({
     row,
     type,
     onPress,
+    cardWidth,
+    numColumns,
 }: {
     row: CollectionGridCardData[]
     type: "anime" | "manga"
     onPress: (item: AL_BaseAnime | AL_BaseManga) => void
+    cardWidth: number
+    numColumns: number
 }) {
     return (
         <View className="flex-row" style={{ gap: GAP, marginBottom: GAP }}>
@@ -254,14 +256,14 @@ const CollectionGridRow = React.memo(function CollectionGridRow({
                 <MediaEntryCard
                     key={entry.id}
                     type={type}
-                    cardWidth={CARD_WIDTH}
+                    cardWidth={cardWidth}
                     media={entry.media as AL_BaseAnime & AL_BaseManga}
                     listData={entry.listData as never}
                     onPress={() => onPress(entry.media)}
                 />
             ))}
-            {row.length < NUM_COLUMNS && Array.from({ length: NUM_COLUMNS - row.length }).map((_, i) => (
-                <View key={`spacer-${i}`} style={{ width: CARD_WIDTH }} />
+            {row.length < numColumns && Array.from({ length: numColumns - row.length }).map((_, i) => (
+                <View key={`spacer-${i}`} style={{ width: cardWidth }} />
             ))}
         </View>
     )
@@ -271,6 +273,15 @@ const CollectionGridRow = React.memo(function CollectionGridRow({
 
 export default function MyListsScreen() {
     const insets = useSafeAreaInsets()
+    const { width: screenWidth } = useWindowDimensions()
+    const { cardWidth, numColumns } = React.useMemo(
+        () => getMediaGridLayout({
+            screenWidth,
+            horizontalPadding: H_PADDING,
+            spacing: GAP,
+        }),
+        [screenWidth],
+    )
     const serverStatus = useServerStatus()
     const isConnected = useIsServerConnected()
     const enableManga = serverStatus?.settings?.library?.enableManga ?? false
@@ -324,8 +335,8 @@ export default function MyListsScreen() {
     }, [type])
 
     // build sections
-    const sections = React.useMemo(() => buildSections(lists, selectedList, titleQuery, filterParams, showAdult, type),
-        [lists, selectedList, titleQuery, filterParams, showAdult, type])
+    const sections = React.useMemo(() => buildSections(lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns),
+        [lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns])
 
     const hasFilters = activeFilterCount > 0 || !!titleQuery.trim()
 
@@ -363,8 +374,8 @@ export default function MyListsScreen() {
             )
         }
 
-        return <CollectionGridRow row={item.row} type={type} onPress={handlePress} />
-    }, [handlePress, type])
+        return <CollectionGridRow row={item.row} type={type} onPress={handlePress} cardWidth={cardWidth} numColumns={numColumns} />
+    }, [cardWidth, handlePress, numColumns, type])
 
     return (
         <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

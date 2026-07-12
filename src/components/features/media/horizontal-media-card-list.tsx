@@ -5,17 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 import { Ionicons } from "@/lib/icons/Ionicons"
 import { buildMediaEntryHref, getMediaEntryKind } from "@/lib/media-entry-route"
+import { getHorizontalCardRenderCount, getHorizontalMediaCardRowHeight, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { router } from "expo-router"
 import { useAtom } from "jotai/react"
 import React from "react"
-import { Dimensions, FlatList, ListRenderItemInfo, View } from "react-native"
+import { FlatList, ListRenderItemInfo, useWindowDimensions, View } from "react-native"
 
-const { width } = Dimensions.get("screen")
-const CARD_WIDTH = (2 / 5) * width
-const CARD_ROW_HEIGHT = CARD_WIDTH * 1.5 + 16
 const SPACING = 10
 const PADDING_HORIZONTAL = 20
-const HORIZONTAL_INITIAL_RENDER = 4
 
 type HorizontalMediaCardListProps<T extends "anime" | "manga"> = {
     title: string
@@ -42,7 +39,17 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
         hideLibraryBadge = false,
     } = props
 
+    const { width: screenWidth } = useWindowDimensions()
     const [, setMediaListPageContent] = useAtom(__media_listPageContentAtom)
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const cardRowHeight = React.useMemo(() => getHorizontalMediaCardRowHeight(cardWidth), [cardWidth])
+    const itemFullWidth = cardWidth + SPACING
+    const initialRenderCount = React.useMemo(() => getHorizontalCardRenderCount({
+        viewportWidth: screenWidth,
+        cardWidth,
+        spacing: SPACING,
+        horizontalPadding: PADDING_HORIZONTAL,
+    }), [cardWidth, screenWidth])
     const visibleMedia = React.useMemo(
         () => !limit ? media : media.slice(0, limit),
         [limit, media],
@@ -51,16 +58,16 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
     const keyExtractor = React.useCallback((item: AL_BaseAnime | AL_BaseManga, index: number) => `${item.id}-${index}`, [])
 
     const getItemLayout = React.useCallback((_: ArrayLike<AL_BaseAnime | AL_BaseManga> | null | undefined, index: number) => ({
-        length: CARD_WIDTH + SPACING,
-        offset: (CARD_WIDTH + SPACING) * index,
+        length: itemFullWidth,
+        offset: itemFullWidth * index,
         index,
-    }), [])
+    }), [itemFullWidth])
 
     const renderItem = React.useCallback(({ item, index }: ListRenderItemInfo<AL_BaseAnime | AL_BaseManga>) => {
         if (index === limit - 1) {
             return (
                 <View
-                    style={{ width: CARD_WIDTH, height: CARD_WIDTH * 1.5 }}
+                    style={{ width: cardWidth, height: cardWidth * 1.5 }}
                     className="rounded-md flex justify-center items-center"
                 >
                     <Button
@@ -88,7 +95,7 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
             return <MediaEntryCard
                 key={index}
                 type="manga"
-                cardWidth={CARD_WIDTH}
+                cardWidth={cardWidth}
                 media={item as AL_BaseManga}
                 showAudienceScore={showAudienceScore}
                 onPress={() => {
@@ -102,7 +109,7 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
         return <MediaEntryCard
             key={index}
             type="anime"
-            cardWidth={CARD_WIDTH}
+            cardWidth={cardWidth}
             media={item as AL_BaseAnime}
             showAudienceScore={showAudienceScore}
             onPress={() => {
@@ -111,7 +118,7 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
             }}
             hideLibraryBadge={hideLibraryBadge}
         />
-    }, [limit, media, onMediaPress, setMediaListPageContent, showAudienceScore, title, type, hideLibraryBadge])
+    }, [cardWidth, limit, media, onMediaPress, setMediaListPageContent, showAudienceScore, title, type, hideLibraryBadge])
 
     if (media.length === 0) return null
 
@@ -140,17 +147,18 @@ export function HorizontalMediaCardList<T extends "anime" | "manga">(props: Hori
                 </Button>}
             </View>
 
-            <View className="w-full" style={{ height: CARD_ROW_HEIGHT }}>
+            <View className="w-full" style={{ height: cardRowHeight }}>
                 <FlatList
                     data={visibleMedia as (AL_BaseAnime | AL_BaseManga)[]}
                     horizontal
-                    style={{ height: CARD_ROW_HEIGHT, width: "100%" }}
+                    style={{ height: cardRowHeight, width: "100%" }}
                     showsHorizontalScrollIndicator={false}
                     keyExtractor={keyExtractor}
                     renderItem={renderItem}
+                    extraData={cardWidth}
                     getItemLayout={getItemLayout}
-                    initialNumToRender={Math.min(visibleMedia.length, HORIZONTAL_INITIAL_RENDER)}
-                    maxToRenderPerBatch={HORIZONTAL_INITIAL_RENDER}
+                    initialNumToRender={Math.min(visibleMedia.length, initialRenderCount)}
+                    maxToRenderPerBatch={initialRenderCount}
                     windowSize={5}
                     removeClippedSubviews
                     contentContainerStyle={{ gap: SPACING, paddingHorizontal: PADDING_HORIZONTAL }}

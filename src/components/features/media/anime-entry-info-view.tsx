@@ -8,14 +8,12 @@ import { LuffyError } from "@/components/shared/luffy-error"
 import { SeaImage } from "@/components/shared/sea-image"
 import { Surface } from "@/components/shared/surface"
 import { buildMediaEntryHref } from "@/lib/media-entry-route"
+import { getHorizontalMediaCardRowHeight, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { cn } from "@/lib/utils"
 import { router } from "expo-router"
 import * as React from "react"
-import { Dimensions, FlatList, Text, View } from "react-native"
+import { FlatList, Text, useWindowDimensions, View } from "react-native"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const CARD_WIDTH = (2 / 5) * SCREEN_WIDTH
-const CARD_ROW_HEIGHT = CARD_WIDTH * 1.5 + 16
 const SPACING = 10
 const CARD_PADDING_H = 20
 
@@ -43,6 +41,9 @@ function stripHtml(value?: string) {
 export function AnimeEntryInfoView({ mediaId, fallbackDescription }: AnimeEntryInfoViewProps) {
     const { data, isLoading } = useGetAnilistAnimeDetails(mediaId)
     const serverStatus = useServerStatus()
+    const { width: screenWidth } = useWindowDimensions()
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const cardRowHeight = React.useMemo(() => getHorizontalMediaCardRowHeight(cardWidth), [cardWidth])
 
     const description = React.useMemo(() => {
         return stripHtml(data?.description || fallbackDescription)
@@ -180,11 +181,11 @@ export function AnimeEntryInfoView({ mediaId, fallbackDescription }: AnimeEntryI
             {relationCards.length > 0 && (
                 <View>
                     <Text className="text-xl font-bold text-foreground mb-3 px-4">Relations</Text>
-                    <View style={{ height: CARD_ROW_HEIGHT }}>
+                    <View style={{ height: cardRowHeight }}>
                         <FlatList
                             data={relationCards}
                             horizontal
-                            style={{ height: CARD_ROW_HEIGHT }}
+                            style={{ height: cardRowHeight }}
                             showsHorizontalScrollIndicator={false}
                             keyExtractor={(item) => item.key}
                             contentContainerStyle={{ gap: SPACING, paddingHorizontal: CARD_PADDING_H }}
@@ -192,11 +193,11 @@ export function AnimeEntryInfoView({ mediaId, fallbackDescription }: AnimeEntryI
                             renderItem={({ item }) => {
                                 if (item.kind === "source-manga") {
                                     return (
-                                        <View style={{ position: "relative", width: CARD_WIDTH }}>
+                                        <View style={{ position: "relative", width: cardWidth }}>
                                             <MediaEntryCard
                                                 type="manga"
                                                 media={item.media}
-                                                cardWidth={CARD_WIDTH}
+                                                cardWidth={cardWidth}
                                                 onPress={() => router.replace(buildMediaEntryHref(item.media, "manga"))}
                                                 overlay={(
                                                     <View
@@ -220,11 +221,11 @@ export function AnimeEntryInfoView({ mediaId, fallbackDescription }: AnimeEntryI
                                 const label = formatRelationType(item.edge.relationType ?? "")
                                 const suffix = item.edge.node?.format === "MOVIE" ? " (Movie)" : ""
                                 return (
-                                    <View style={{ position: "relative", width: CARD_WIDTH }}>
+                                    <View style={{ position: "relative", width: cardWidth }}>
                                         <MediaEntryCard
                                             type="anime"
                                             media={item.edge.node as AL_BaseAnime}
-                                            cardWidth={CARD_WIDTH}
+                                            cardWidth={cardWidth}
                                             onPress={() => router.replace(buildMediaEntryHref(item.edge.node as AL_BaseAnime, "anime"))}
                                             overlay={(
                                                 <View

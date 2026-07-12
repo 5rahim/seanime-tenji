@@ -7,14 +7,12 @@ import { LuffyError } from "@/components/shared/luffy-error"
 import { SeaImage } from "@/components/shared/sea-image"
 import { Surface } from "@/components/shared/surface"
 import { buildMediaEntryHref } from "@/lib/media-entry-route"
+import { getHorizontalMediaCardRowHeight, getHorizontalMediaCardWidth } from "@/lib/responsive-card-layout"
 import { cn } from "@/lib/utils"
 import { router } from "expo-router"
 import * as React from "react"
-import { Dimensions, FlatList, Text, View } from "react-native"
+import { FlatList, Text, useWindowDimensions, View } from "react-native"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const CARD_WIDTH = (2 / 5) * SCREEN_WIDTH
-const CARD_ROW_HEIGHT = CARD_WIDTH * 1.5 + 16
 const SPACING = 10
 const CARD_PADDING_H = 20
 
@@ -41,6 +39,9 @@ function stripHtml(value?: string) {
 
 export function MangaEntryInfoView({ mediaId, fallbackDescription }: MangaEntryInfoViewProps) {
     const { data, isLoading } = useGetMangaEntryDetails(mediaId)
+    const { width: screenWidth } = useWindowDimensions()
+    const cardWidth = React.useMemo(() => getHorizontalMediaCardWidth(screenWidth), [screenWidth])
+    const cardRowHeight = React.useMemo(() => getHorizontalMediaCardRowHeight(cardWidth), [cardWidth])
 
     const description = React.useMemo(() => {
         return stripHtml(fallbackDescription)
@@ -139,11 +140,11 @@ export function MangaEntryInfoView({ mediaId, fallbackDescription }: MangaEntryI
             {animeRelations.length > 0 && (
                 <View>
                     <Text className="text-xl font-bold text-foreground mb-3 px-4">Anime Adaptation</Text>
-                    <View style={{ height: CARD_ROW_HEIGHT }}>
+                    <View style={{ height: cardRowHeight }}>
                         <FlatList
                             data={animeRelations}
                             horizontal
-                            style={{ height: CARD_ROW_HEIGHT }}
+                            style={{ height: cardRowHeight }}
                             showsHorizontalScrollIndicator={false}
                             keyExtractor={(item) => String(item.node?.id)}
                             contentContainerStyle={{ gap: SPACING, paddingHorizontal: CARD_PADDING_H }}
@@ -152,11 +153,11 @@ export function MangaEntryInfoView({ mediaId, fallbackDescription }: MangaEntryI
                                 const label = formatRelationType(item.relationType ?? "")
                                 const suffix = item.node?.format === "MOVIE" ? " (Movie)" : ""
                                 return (
-                                    <View style={{ position: "relative", width: CARD_WIDTH }}>
+                                    <View style={{ position: "relative", width: cardWidth }}>
                                         <MediaEntryCard
                                             type="anime"
                                             media={item.node as AL_BaseAnime}
-                                            cardWidth={CARD_WIDTH}
+                                            cardWidth={cardWidth}
                                             onPress={() => router.replace(buildMediaEntryHref(item.node as AL_BaseAnime, "anime"))}
                                             overlay={(
                                                 <View

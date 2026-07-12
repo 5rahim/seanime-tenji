@@ -5,23 +5,20 @@ import { MediaEntryCard } from "@/components/features/media/media-entry-card"
 import { SafeView } from "@/components/layout/layout-view"
 import { LibrarySearchBar } from "@/components/shared/library-search-bar"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
+import { getMediaGridLayout } from "@/lib/responsive-card-layout"
 import { DEFAULT_SEARCH_PARAMS, getActiveFiltersCount, isSearchActive, SearchParams, searchParamsAtom } from "@/lib/search/search-atoms"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { router, useLocalSearchParams } from "expo-router"
 import { useAtom } from "jotai"
 import * as React from "react"
-import { ActivityIndicator, Dimensions, FlatList, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, Text, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { DiscoverModeToggle } from "."
 
-const { width: SCREEN_WIDTH } = Dimensions.get("screen")
-const NUM_COLUMNS = 3
 const H_PADDING = 14
 const GAP = 10
-const CARD_WIDTH = (SCREEN_WIDTH - (NUM_COLUMNS - 1) * GAP - 2 * H_PADDING) / NUM_COLUMNS
 const SEARCH_INITIAL_ROWS = 4
-const SEARCH_ROW_HEIGHT = CARD_WIDTH * 1.5 + GAP + 8
 
 function EmptyState({ query }: { query: string }) {
     return (
@@ -53,6 +50,17 @@ function FooterLoader({ isLoading }: { isLoading: boolean }) {
 export default function SearchScreen() {
     const insets = useSafeAreaInsets()
     const { type: initialType } = useLocalSearchParams<{ type?: string }>()
+    const { width: screenWidth } = useWindowDimensions()
+    const usableWidth = Math.max(1, screenWidth - insets.left - insets.right)
+    const { cardWidth, numColumns } = React.useMemo(
+        () => getMediaGridLayout({
+            screenWidth: usableWidth,
+            horizontalPadding: H_PADDING,
+            spacing: GAP,
+        }),
+        [usableWidth],
+    )
+    const searchRowHeight = React.useMemo(() => cardWidth * 1.5 + GAP + 8, [cardWidth])
 
     useIOSScrollRefreshRateWorkaround()
 
@@ -117,31 +125,31 @@ export default function SearchScreen() {
         }
     }
 
-    function handlePress(item: AL_BaseAnime | AL_BaseManga) {
+    const handlePress = React.useCallback((item: AL_BaseAnime | AL_BaseManga) => {
         router.push(`/(app)/entry/${params.type}/${item.id}`)
-    }
+    }, [params.type])
 
     const keyExtractor = React.useCallback((item: AL_BaseAnime | AL_BaseManga, index: number) => `${item.id}-${index}`, [])
 
     const getItemLayout = React.useCallback((_: ArrayLike<AL_BaseAnime | AL_BaseManga> | null | undefined, index: number) => {
-        const rowIndex = Math.floor(index / NUM_COLUMNS)
+        const rowIndex = Math.floor(index / numColumns)
 
         return {
-            length: SEARCH_ROW_HEIGHT,
-            offset: 12 + (rowIndex * SEARCH_ROW_HEIGHT),
+            length: searchRowHeight,
+            offset: 12 + (rowIndex * searchRowHeight),
             index,
         }
-    }, [])
+    }, [numColumns, searchRowHeight])
 
     const renderSearchItem = React.useCallback(({ item }: { item: AL_BaseAnime | AL_BaseManga }) => (
         <MediaEntryCard
             type={params.type}
-            cardWidth={CARD_WIDTH}
+            cardWidth={cardWidth}
             media={item as any}
             onPress={() => handlePress(item)}
             showAudienceScore
         />
-    ), [params.type])
+    ), [cardWidth, handlePress, params.type])
 
     const isLoading = activeQuery.isLoading
     const isFetchingMore = activeQuery.isFetchingNextPage
@@ -182,15 +190,16 @@ export default function SearchScreen() {
                 </View>
             ) : (
                 <FlatList
+                    key={`search-grid-${numColumns}`}
                     data={items as (AL_BaseAnime | AL_BaseManga)[]}
-                    numColumns={NUM_COLUMNS}
+                    numColumns={numColumns}
                     keyExtractor={keyExtractor}
                     showsVerticalScrollIndicator={false}
                     onEndReached={handleLoadMore}
                     onEndReachedThreshold={0.4}
                     getItemLayout={getItemLayout}
-                    initialNumToRender={NUM_COLUMNS * SEARCH_INITIAL_ROWS}
-                    maxToRenderPerBatch={NUM_COLUMNS * 2}
+                    initialNumToRender={numColumns * SEARCH_INITIAL_ROWS}
+                    maxToRenderPerBatch={numColumns * 2}
                     updateCellsBatchingPeriod={16}
                     windowSize={7}
                     removeClippedSubviews

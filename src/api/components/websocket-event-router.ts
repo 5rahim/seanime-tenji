@@ -25,6 +25,9 @@ const WEBSOCKET_EVENTS = {
     PlaybackManagerProgressVideoCompleted: "playback-manager-progress-video-completed",
     // manga download events
     ChapterDownloadQueueUpdated: "chapter-download-queue-updated",
+    // server download events
+    ActiveTorrentCountUpdated: "active-torrent-count-updated",
+    DebridDownloadProgress: "debrid-download-progress",
     // extension events
     ExtensionsReloaded: "extensions-reloaded",
     ExtensionUpdatesFound: "extension-updates-found",
@@ -40,6 +43,14 @@ type WebsocketServerEvent = {
     type: string
     payload?: unknown
 }
+
+type ActiveTorrentCountPayload = {
+    downloading: number
+    seeding: number
+    paused: number
+}
+
+const DOWNLOAD_COMPLETION_FOLLOW_UP_MS = 5_000
 
 const animeCollectionRefreshKeys = [
     API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key,
@@ -89,6 +100,7 @@ const libraryRefreshKeys = [
     API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key,
     API_ENDPOINTS.ANILIST.GetAnimeCollection.key,
     API_ENDPOINTS.LIBRARY_EXPLORER.GetLibraryExplorerFileTree.key,
+    API_ENDPOINTS.LOCALFILES.GetLocalFiles.key,
     API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key,
 ] as const
 
@@ -106,8 +118,46 @@ const chapterDownloadRefreshKeys = [
     API_ENDPOINTS.MANGA_DOWNLOAD.GetMangaDownloadsList.key,
 ] as const
 
+const torrentClientRefreshKeys = [
+    API_ENDPOINTS.TORRENT_CLIENT.GetActiveTorrentList.key,
+] as const
+
+const debridDownloadRefreshKeys = [
+    API_ENDPOINTS.DEBRID.DebridGetTorrents.key,
+] as const
+
+const serverLocalInvalidationKeys = [
+    API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key,
+    API_ENDPOINTS.LOCALFILES.GetLocalFiles.key,
+    API_ENDPOINTS.ANIME_ENTRIES.GetAnimeEntry.key,
+    API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key,
+] as const
+
 async function invalidateQueryKeys(queryClient: ReturnType<typeof useQueryClient>, queryKeys: readonly string[]) {
     await Promise.all(queryKeys.map(queryKey => queryClient.invalidateQueries({ queryKey: [queryKey] })))
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+    return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function parseActiveTorrentCountPayload(payload: unknown): ActiveTorrentCountPayload | null {
+    if (!isObject(payload)) return null
+
+    const { downloading, seeding, paused } = payload
+    if (typeof downloading !== "number" || typeof seeding !== "number" || typeof paused !== "number") {
+        return null
+    }
+
+    return { downloading, seeding, paused }
+}
+
+function isDebridDownloadCompletedPayload(payload: unknown): boolean {
+    return isObject(payload) && payload.status === "completed"
+}
+
+function shouldSyncServerLocalForInvalidation(queryKeys: readonly string[]): boolean {
+    return queryKeys.some(queryKey => serverLocalInvalidationKeys.includes(queryKey))
 }
 
 function parseWebsocketServerEvent(data: unknown): WebsocketServerEvent | null {
@@ -130,10 +180,25 @@ function parseWebsocketServerEvent(data: unknown): WebsocketServerEvent | null {
 
 export function useWebsocketEventRouter(socket: WebSocket | null) {
     const queryClient = useQueryClient()
+    const activeTorrentCountRef = React.useRef<ActiveTorrentCountPayload | null>(null)
+    const downloadCompletionTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
     React.useEffect(() => {
         if (!socket) {
             return
+        }
+
+        const requestDownloadCompletionSync = () => {
+            requestServerLocalSync()
+
+            if (downloadCompletionTimerRef.current) {
+                clearTimeout(downloadCompletionTimerRef.current)
+            }
+
+            downloadCompletionTimerRef.current = setTimeout(() => {
+                downloadCompletionTimerRef.current = null
+                requestServerLocalSync()
+            }, DOWNLOAD_COMPLETION_FOLLOW_UP_MS)
         }
 
         const handleMessage = async (event: WebSocketMessageEvent) => {
@@ -196,6 +261,28 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
                 case WEBSOCKET_EVENTS.ChapterDownloadQueueUpdated:
                     await invalidateQueryKeys(queryClient, chapterDownloadRefreshKeys)
                     return
+                case WEBSOCKET_EVENTS.ActiveTorrentCountUpdated: {
+                    const payload = parseActiveTorrentCountPayload(message.payload)
+                    if (!payload) return
+
+                    const previousPayload = activeTorrentCountRef.current
+                    activeTorrentCountRef.current = payload
+
+                    if (
+                        previousPayload
+                        && (payload.downloading < previousPayload.downloading || payload.seeding > previousPayload.seeding)
+                    ) {
+                        await invalidateQueryKeys(queryClient, torrentClientRefreshKeys)
+                        requestDownloadCompletionSync()
+                    }
+                    return
+                }
+                case WEBSOCKET_EVENTS.DebridDownloadProgress:
+                    if (isDebridDownloadCompletedPayload(message.payload)) {
+                        await invalidateQueryKeys(queryClient, debridDownloadRefreshKeys)
+                        requestDownloadCompletionSync()
+                    }
+                    return
                 case WEBSOCKET_EVENTS.SyncLocalFinished:
                     await invalidateQueryKeys(queryClient, syncLocalFinishedKeys)
                     requestServerLocalSync()
@@ -203,6 +290,9 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
                 case WEBSOCKET_EVENTS.InvalidateQueries:
                     if (Array.isArray(message.payload) && message.payload.every(item => typeof item === "string")) {
                         await invalidateQueryKeys(queryClient, message.payload)
+                        if (shouldSyncServerLocalForInvalidation(message.payload)) {
+                            requestServerLocalSync()
+                        }
                     } else {
                         logger("websocket-event-router").warning("Received invalidate-queries event with invalid payload", message.payload)
                     }
@@ -216,6 +306,10 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
 
         return () => {
             socket.removeEventListener("message", handleMessage)
+            if (downloadCompletionTimerRef.current) {
+                clearTimeout(downloadCompletionTimerRef.current)
+                downloadCompletionTimerRef.current = null
+            }
         }
     }, [queryClient, socket])
 }

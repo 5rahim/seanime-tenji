@@ -1,17 +1,14 @@
 import { AL_BaseAnime, AL_BaseManga } from "@/api/generated/types"
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
+import { getMediaGridLayout } from "@/lib/responsive-card-layout"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import * as React from "react"
-import { Dimensions, FlatList, StyleProp, Text, ViewStyle } from "react-native"
+import { FlatList, StyleProp, Text, useWindowDimensions, ViewStyle } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
 
-const { width } = Dimensions.get("screen")
-const NUM_COLUMNS = 3
 const SPACING = 10
 const PADDING_HORIZONTAL = 14
-const CARD_WIDTH = (width - (NUM_COLUMNS - 1) * SPACING - 2 * PADDING_HORIZONTAL) / NUM_COLUMNS
 const GRID_INITIAL_ROWS = 4
-const GRID_ROW_HEIGHT = CARD_WIDTH * 1.5 + SPACING + 8
 
 type MediaEntryGridProps<T extends "anime" | "manga"> = {
     type: T
@@ -30,6 +27,17 @@ export function MediaEntryGrid<T extends "anime" | "manga">({
     contentContainerStyle,
     topPadding = 8,
 }: MediaEntryGridProps<T>) {
+    const { width: screenWidth } = useWindowDimensions()
+    const { cardWidth, numColumns } = React.useMemo(
+        () => getMediaGridLayout({
+            screenWidth,
+            horizontalPadding: PADDING_HORIZONTAL,
+            spacing: SPACING,
+        }),
+        [screenWidth],
+    )
+    const gridRowHeight = React.useMemo(() => cardWidth * 1.5 + SPACING + 8, [cardWidth])
+
     if (media.length === 0) {
         return (
             <Animated.View
@@ -49,33 +57,34 @@ export function MediaEntryGrid<T extends "anime" | "manga">({
     const renderItem = React.useCallback(({ item }: { item: AL_BaseAnime | AL_BaseManga }) => (
         <MediaEntryCard
             type={type}
-            cardWidth={CARD_WIDTH}
+            cardWidth={cardWidth}
             media={item as any}
             onPress={() => onPress(item as any)}
         />
-    ), [onPress, type])
+    ), [cardWidth, onPress, type])
 
     const getItemLayout = React.useCallback((_: ArrayLike<AL_BaseAnime | AL_BaseManga> | null | undefined, index: number) => {
-        const rowIndex = Math.floor(index / NUM_COLUMNS)
+        const rowIndex = Math.floor(index / numColumns)
 
         return {
-            length: GRID_ROW_HEIGHT,
-            offset: topPadding + (rowIndex * GRID_ROW_HEIGHT),
+            length: gridRowHeight,
+            offset: topPadding + (rowIndex * gridRowHeight),
             index,
         }
-    }, [topPadding])
+    }, [gridRowHeight, numColumns, topPadding])
 
     return (
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
             <FlatList
+                key={`media-grid-${numColumns}`}
                 data={media as (AL_BaseAnime | AL_BaseManga)[]}
-                numColumns={NUM_COLUMNS}
+                numColumns={numColumns}
                 showsVerticalScrollIndicator={false}
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
                 getItemLayout={getItemLayout}
-                initialNumToRender={NUM_COLUMNS * GRID_INITIAL_ROWS}
-                maxToRenderPerBatch={NUM_COLUMNS * 2}
+                initialNumToRender={numColumns * GRID_INITIAL_ROWS}
+                maxToRenderPerBatch={numColumns * 2}
                 updateCellsBatchingPeriod={16}
                 windowSize={7}
                 removeClippedSubviews
