@@ -3,6 +3,7 @@ const { withAndroidManifest } = require("expo/config-plugins")
 const EXTERNAL_PLAYER_PACKAGES = [
     "org.videolan.vlc",
     "is.xyz.mpv",
+    "app.marlboroadvance.mpvex",
     "com.mxtech.videoplayer.ad",
     "com.mxtech.videoplayer.pro",
     "com.brouken.player",

@@ -77,6 +77,13 @@ export const EXTERNAL_PLAYER_PRESETS: ExternalPlayerPreset[] = [
         androidPackage: "is.xyz.mpv",
     },
     {
+        id: "mpvex",
+        name: "mpvEX",
+        platform: "android",
+        urlTemplate: "intent://{url}#Intent;package=app.marlboroadvance.mpvex;scheme=http;end",
+        androidPackage: "app.marlboroadvance.mpvex",
+    },
+    {
         id: "mxplayer",
         name: "MX Player",
         platform: "android",
