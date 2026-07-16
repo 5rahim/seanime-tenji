@@ -2,9 +2,12 @@ import type { Anime_Entry, ExtensionRepo_OnlinestreamProviderExtensionItem, Onli
 import { useListOnlinestreamProviderExtensions } from "@/api/hooks/extensions.hooks"
 import { useGetOnlineStreamEpisodeList, useGetOnlineStreamEpisodeSource, useOnlineStreamEmptyCache } from "@/api/hooks/onlinestream.hooks"
 import { createAtomStorage } from "@/atoms/storage"
+import { logger } from "@/lib/utils/logger"
 import { useAtom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
 import * as React from "react"
+
+const log = logger("online-stream")
 
 function normalizeLabel(value: string | null | undefined): string | null {
     return value?.trim().toLowerCase() ?? null
@@ -90,6 +93,7 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
         data: episodeListResponse,
         isLoading: isLoadingEpisodes,
         isFetching: isFetchingEpisodes,
+        error: episodeListError,
     } = useGetOnlineStreamEpisodeList(mediaId, provider ?? "", dubbed)
 
     const episodes = React.useMemo(
@@ -102,6 +106,7 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
         data: episodeSource,
         isLoading: isLoadingSource,
         isFetching: isFetchingSource,
+        error: episodeSourceError,
     } = useGetOnlineStreamEpisodeSource(
         mediaId,
         provider ?? "",
@@ -114,6 +119,40 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
         () => episodeSource?.videoSources ?? [],
         [episodeSource?.videoSources],
     )
+
+    React.useEffect(() => {
+        if (!episodeListResponse || !mediaId || !provider) return
+        log.info("Online episodes loaded", {
+            mediaId,
+            provider,
+            dubbed,
+            count: episodeListResponse.episodes?.length ?? 0,
+        })
+    }, [dubbed, episodeListResponse, mediaId, provider])
+
+    React.useEffect(() => {
+        if (!episodeListError) return
+        log.warning("Failed to load online episodes", { mediaId, provider, dubbed }, episodeListError)
+    }, [dubbed, episodeListError, mediaId, provider])
+
+    React.useEffect(() => {
+        if (!episodeSource || playRequestedEpisode === null) return
+        log.info("Online stream sources loaded", {
+            mediaId,
+            provider,
+            episodeNumber: playRequestedEpisode,
+            sourceCount: episodeSource.videoSources?.length ?? 0,
+        })
+    }, [episodeSource, mediaId, playRequestedEpisode, provider])
+
+    React.useEffect(() => {
+        if (!episodeSourceError || playRequestedEpisode === null) return
+        log.warning("Failed to load online stream sources", {
+            mediaId,
+            provider,
+            episodeNumber: playRequestedEpisode,
+        }, episodeSourceError)
+    }, [episodeSourceError, mediaId, playRequestedEpisode, provider])
 
     // persisted quality preference
     const [selectedQuality, setSelectedQuality] = useAtom(selectedQualityAtom)
@@ -202,21 +241,24 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
 
     // reset state when provider or dubbed changes
     const handleProviderChange = React.useCallback((newProvider: string) => {
+        log.info("Online stream provider changed", { mediaId, provider: newProvider })
         setProvider(newProvider)
         setPlayRequestedEpisode(null)
         setSelectedServer(null)
-    }, [setProvider, setSelectedServer])
+    }, [mediaId, setProvider, setSelectedServer])
 
     const handleDubbedChange = React.useCallback((newDubbed: boolean) => {
+        log.info("Online stream audio mode changed", { mediaId, dubbed: newDubbed })
         setDubbed(newDubbed)
         setPlayRequestedEpisode(null)
         setSelectedServer(null)
-    }, [setSelectedServer])
+    }, [mediaId, setSelectedServer])
 
     // user taps an episode, start fetching sources for it
     const requestPlay = React.useCallback((episodeNumber: number) => {
+        log.info("Online stream playback requested", { mediaId, provider, episodeNumber, dubbed })
         setPlayRequestedEpisode(episodeNumber)
-    }, [])
+    }, [dubbed, mediaId, provider])
 
     // cancel the current play request (e.g. user taps same episode again)
     const cancelPlayRequest = React.useCallback(() => {

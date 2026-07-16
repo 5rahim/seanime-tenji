@@ -120,6 +120,7 @@ export default function MangaDownloadsScreen() {
                                     pageSize={DOWNLOADED_MANGA_PAGE_SIZE}
                                     currentPage={downloadedMangaPagination.page}
                                     onPageChange={downloadedMangaPagination.setPage}
+                                    logName="downloaded manga"
                                 />
                             </View>
                         )}

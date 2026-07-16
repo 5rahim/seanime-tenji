@@ -84,6 +84,7 @@ export async function buildSeaQuery<T, D = unknown>(
     }: SeaQuery<D>): Promise<T | undefined> {
     const url = new URL(getServerBaseUrl(serverUrl) + endpoint)
     const resolvedAuthToken = authToken ?? getStoredServerAuthToken()
+    const startedAt = Date.now()
 
     // append params to the url if they exist and it's a GET request
     if (params && method === "GET") {
@@ -156,7 +157,11 @@ export async function buildSeaQuery<T, D = unknown>(
             markServerUnreachable()
         }
 
-        log.warning("Fetch error", seaError)
+        log.warning(`${method} ${endpoint} failed`, {
+            status: seaError.status ?? null,
+            connectivityFailure,
+            durationMs: Date.now() - startedAt,
+        }, seaError)
         // only show toast when we believe the device is online, avoids
         // spamming "Network request failed" toasts while offline
         if (!wasAborted && !muteError && isGlobalConnected()) {
@@ -261,7 +266,6 @@ export function useServerQuery<R, V = any>(
         }
 
         if (!muteError && isGlobalConnected()) {
-            log.warning("Server error", props.error)
             toast.error(_handleSeaError(props.error?.error))
         }
     }, [props.error, props.isError, muteError, setServerAuthToken])

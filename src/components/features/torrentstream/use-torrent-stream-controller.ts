@@ -31,9 +31,12 @@ import {
     torrentStreamLoadingStateAtom,
     torrentStreamPendingInfoAtom,
 } from "@/lib/player"
+import { logger } from "@/lib/utils/logger"
 import { useAtom } from "jotai"
 import { useAtomValue } from "jotai/react"
 import * as React from "react"
+
+const log = logger("torrent-stream")
 
 export const NONE_PROVIDER = "none"
 export const TORRENT_RESOLUTIONS = ["2160", "1080", "720", "540", "480"] as const
@@ -413,6 +416,11 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     const startAutoSelectedStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode) => {
             if (!episode.aniDBEpisode || !mediaId) return
             episodeSelectionLockedRef.current = true
+            log.info(`Starting ${mode} stream`, {
+                mediaId,
+                episodeNumber: episode.episodeNumber,
+                selection: "auto",
+            })
 
             setPendingInfo({
                 streamMode: mode,
@@ -450,10 +458,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     },
                     {
                         onSuccess: () => {
+                            log.success("Debrid stream request accepted", { mediaId, episodeNumber: episode.episodeNumber })
                             setIsPreparing(true)
                             resetPicker()
                         },
-                        onError: () => {
+                        onError: error => {
+                            log.error("Debrid stream request failed", {
+                                mediaId,
+                                episodeNumber: episode.episodeNumber,
+                            }, error)
                             clearPendingStreamState()
                         },
                     },
@@ -475,10 +488,15 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 },
                 {
                     onSuccess: () => {
+                        log.success("Torrent stream request accepted", { mediaId, episodeNumber: episode.episodeNumber })
                         setIsPreparing(true)
                         resetPicker()
                     },
-                    onError: () => {
+                    onError: error => {
+                        log.error("Torrent stream request failed", {
+                            mediaId,
+                            episodeNumber: episode.episodeNumber,
+                        }, error)
                         clearPendingStreamState()
                     },
                 },
@@ -497,6 +515,13 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         }, mode: StreamMode = streamMode) => {
             if (!params.episode.aniDBEpisode || !mediaId) return
             episodeSelectionLockedRef.current = true
+            log.info(`Starting ${mode} stream`, {
+                mediaId,
+                episodeNumber: params.episode.episodeNumber,
+                selection: params.launchMode ?? "manual",
+                isBatch: !!params.torrent.isBatch,
+                hasFileSelection: params.fileId !== undefined || params.fileIndex !== undefined,
+            })
 
             setPendingInfo({
                 streamMode: mode,
@@ -544,10 +569,18 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                     },
                     {
                         onSuccess: () => {
+                            log.success("Debrid stream request accepted", {
+                                mediaId,
+                                episodeNumber: params.episode.episodeNumber,
+                            })
                             setIsPreparing(true)
                             resetPicker()
                         },
-                        onError: () => {
+                        onError: error => {
+                            log.error("Debrid stream request failed", {
+                                mediaId,
+                                episodeNumber: params.episode.episodeNumber,
+                            }, error)
                             clearPendingStreamState()
                         },
                     },
@@ -572,10 +605,18 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 },
                 {
                     onSuccess: () => {
+                        log.success("Torrent stream request accepted", {
+                            mediaId,
+                            episodeNumber: params.episode.episodeNumber,
+                        })
                         setIsPreparing(true)
                         resetPicker()
                     },
-                    onError: () => {
+                    onError: error => {
+                        log.error("Torrent stream request failed", {
+                            mediaId,
+                            episodeNumber: params.episode.episodeNumber,
+                        }, error)
                         clearPendingStreamState()
                     },
                 },
@@ -823,6 +864,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     }, [buildBatchEpisodeFiles, filePreviews, selectedEpisode, selectedTorrent, sheetStage, startManualStream, streamMode, mode])
 
     const stopCurrentStream = React.useCallback(() => {
+        log.info(`Stopping ${streamMode} stream`)
         if (streamMode === "debrid") {
             cancelDebridStream({
                 options: {
@@ -830,18 +872,22 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
                 },
             }, {
                 onSuccess: () => {
+                    log.success("Debrid stream stopped")
                     clearPendingStreamState()
                     setSelectedTorrent(null)
                 },
+                onError: error => log.error("Failed to stop debrid stream", error),
             })
             return
         }
 
         stopTorrentStream(undefined, {
             onSuccess: () => {
+                log.success("Torrent stream stopped")
                 clearPendingStreamState()
                 setSelectedTorrent(null)
             },
+            onError: error => log.error("Failed to stop torrent stream", error),
         })
     }, [cancelDebridStream, clearPendingStreamState, stopTorrentStream, streamMode])
 

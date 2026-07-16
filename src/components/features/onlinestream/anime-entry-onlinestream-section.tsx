@@ -277,6 +277,7 @@ export function AnimeEntryOnlinestreamSection({ entry }: AnimeEntryOnlinestreamS
                                 totalCount={controller.episodes.length}
                                 currentPage={onlinePage}
                                 onPageChange={setOnlinePage}
+                                logName="online episodes"
                             />
                         </View>
                     )}
@@ -336,5 +337,4 @@ export function AnimeEntryOnlinestreamSection({ entry }: AnimeEntryOnlinestreamS
         </>
     )
 }
-
 

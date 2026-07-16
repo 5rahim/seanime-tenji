@@ -125,6 +125,7 @@ export default function MangaDownloadQueueScreen() {
                                     pageSize={QUEUE_PAGE_SIZE}
                                     currentPage={queuedDownloadsPagination.page}
                                     onPageChange={queuedDownloadsPagination.setPage}
+                                    logName="manga download queue"
                                 />
                             </View>
                         )}
@@ -157,6 +158,7 @@ export default function MangaDownloadQueueScreen() {
                                     pageSize={QUEUE_PAGE_SIZE}
                                     currentPage={failedQueuePagination.page}
                                     onPageChange={failedQueuePagination.setPage}
+                                    logName="failed manga downloads"
                                 />
                             </View>
                         )}

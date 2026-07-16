@@ -122,6 +122,7 @@ export default function AnimeDownloadsScreen() {
                                     pageSize={DOWNLOADED_ANIME_PAGE_SIZE}
                                     currentPage={downloadedAnimePagination.page}
                                     onPageChange={downloadedAnimePagination.setPage}
+                                    logName="downloaded anime"
                                 />
                             </View>
                         )}

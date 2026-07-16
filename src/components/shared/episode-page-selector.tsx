@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils"
+import { logger } from "@/lib/utils/logger"
 import * as React from "react"
 import { Pressable, ScrollView, Text, View } from "react-native"
 
 export const EPISODE_PAGE_SIZE = 24
+const log = logger("pagination")
 
 type EpisodePageSelectorProps = {
     totalCount: number
@@ -10,6 +12,7 @@ type EpisodePageSelectorProps = {
     currentPage: number
     onPageChange: (page: number) => void
     className?: string
+    logName?: string
 }
 
 /**
@@ -23,6 +26,7 @@ export function EpisodePageSelector({
     currentPage,
     onPageChange,
     className,
+    logName = "episode list",
 }: EpisodePageSelectorProps) {
     const pageCount = Math.ceil(totalCount / pageSize)
     if (pageCount <= 1) return null
@@ -43,7 +47,14 @@ export function EpisodePageSelector({
                     return (
                         <Pressable
                             key={i}
-                            onPress={() => onPageChange(i)}
+                            onPress={() => {
+                                if (isActive) return
+                                log.info(`${logName}: page ${currentPage + 1} -> ${i + 1} of ${pageCount}`, {
+                                    range: `${start}-${end}`,
+                                    totalCount,
+                                })
+                                onPageChange(i)
+                            }}
                             className={cn(
                                 "h-8 items-center justify-center rounded-full border px-3.5",
                                 isActive

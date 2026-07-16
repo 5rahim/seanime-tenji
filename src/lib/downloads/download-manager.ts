@@ -327,12 +327,19 @@ async function processQueuedAnimeDownload(item: QueuedAnimeDownload): Promise<vo
     }
     activeDownloads.set(key, tracker)
 
-    const activeNativeDownload = await getManagedNativeDownload(nativeDownloadId).catch(() => undefined)
+    const activeNativeDownload = await getManagedNativeDownload(nativeDownloadId).catch(error => {
+        log.warning("Failed to inspect native download state", {
+            mediaId: item.mediaId,
+            episodeId: item.episodeId,
+        }, error)
+        return undefined
+    })
 
     if (!activeNativeDownload && destFile.exists) {
         const fileSize = destFile.size ?? 0
         if (existing?.status !== "failed" && fileSize > 0) {
             markDownloadCompleted(item.mediaId, item.episodeId, destFile.uri, fileSize)
+            log.success(`Recovered completed download: ${item.episodeId} (${formatBytes(fileSize)})`)
             activeDownloads.delete(key)
             item.resolve()
             processNextAnimeQueue()
@@ -342,7 +349,11 @@ async function processQueuedAnimeDownload(item: QueuedAnimeDownload): Promise<vo
         try {
             destFile.delete()
         }
-        catch {
+        catch (error) {
+            log.warning("Failed to remove stale anime download file", {
+                mediaId: item.mediaId,
+                episodeId: item.episodeId,
+            }, error)
         }
     }
 
@@ -357,7 +368,11 @@ async function processQueuedAnimeDownload(item: QueuedAnimeDownload): Promise<vo
         "/api/v1/mediastream/file",
     )
 
-    log.info(`Starting download: ${item.episodeId} -> ${destFile.uri}`)
+    log.info(`${activeNativeDownload ? "Reattaching native download" : "Starting download"}: ${item.episodeId}`, {
+        mediaId: item.mediaId,
+        episodeNumber: item.episodeNumber,
+        queued: queuedDownloads.length,
+    })
 
     try {
         const downloadOptions: ManagedNativeDownloadOptions = {
@@ -530,6 +545,13 @@ export async function startBatchDownload(
         return existing?.status !== "completed" && existing?.status !== "downloading" && existing?.status !== "pending"
     })
 
+    log.info("Anime batch download requested", {
+        mediaId: entry.mediaId,
+        requested: episodes.length,
+        queued: pendingEpisodes.length,
+        skipped: episodes.length - pendingEpisodes.length,
+    })
+
     let queuedDownloads: Promise<void>[] = []
     batchDownloadStoreWrites(() => {
         queuedDownloads = pendingEpisodes.map(episode => enqueueAnimeDownload(buildEpisodeDownloadSource(serverUrl, entry, episode)))
@@ -543,6 +565,7 @@ export async function retryAnimeDownload(serverUrl: string, episode: DownloadedE
 }
 
 export async function retryFailedAnimeDownloads(serverUrl: string, episodes: DownloadedEpisode[]): Promise<void> {
+    log.info("Retrying failed anime downloads", { count: episodes.length })
     let queuedDownloads: Promise<void>[] = []
     batchDownloadStoreWrites(() => {
         queuedDownloads = episodes.map(episode => retryAnimeDownload(serverUrl, episode))
@@ -556,6 +579,7 @@ export async function resumeAnimeDownload(serverUrl: string, episode: Downloaded
 }
 
 export async function resumeStalledAnimeDownloads(serverUrl: string, episodes: DownloadedEpisode[]): Promise<void> {
+    log.info("Resuming stalled anime downloads", { count: episodes.length })
     let queuedDownloads: Promise<void>[] = []
     batchDownloadStoreWrites(() => {
         queuedDownloads = episodes.map(episode => resumeAnimeDownload(serverUrl, episode))
@@ -570,12 +594,14 @@ export async function resumeStalledAnimeDownloads(serverUrl: string, episodes: D
 export function cancelAnimeDownload(mediaId: number, episodeId: string): void {
     const key = dlKey(mediaId, episodeId)
     const queuedIndex = queuedDownloads.findIndex(item => item.mediaId === mediaId && item.episodeId === episodeId)
+    const wasQueued = queuedIndex >= 0
     if (queuedIndex >= 0) {
         const [queued] = queuedDownloads.splice(queuedIndex, 1)
         queued?.resolve()
     }
 
     const active = activeDownloads.get(key)
+    const wasActive = !!active
 
     if (active) {
         active.cancelled = true
@@ -590,11 +616,13 @@ export function cancelAnimeDownload(mediaId: number, episodeId: string): void {
             const file = new File(ep.localFilePath)
             if (file.exists) file.delete()
         }
-        catch {
+        catch (error) {
+            log.warning("Failed to remove cancelled anime download file", { mediaId, episodeId }, error)
         }
     }
 
     removeDownloadedEpisode(mediaId, episodeId)
+    log.info("Anime download cancelled", { mediaId, episodeId, wasQueued, wasActive })
 }
 
 /**
@@ -612,16 +640,19 @@ export function deleteAnimeDownloadedFile(mediaId: number, episodeId: string): v
             const file = new File(ep.localFilePath)
             if (file.exists) file.delete()
         }
-        catch {
+        catch (error) {
+            log.warning("Failed to remove anime download file", { mediaId, episodeId }, error)
         }
     }
     removeDownloadedEpisode(mediaId, episodeId)
+    log.info("Anime download removed", { mediaId, episodeId })
 }
 
 /**
  * Delete all downloaded files for a media.
  */
 export async function deleteAllAnimeDownloadsForMedia(mediaId: number): Promise<void> {
+    log.info("Removing all anime downloads for media", { mediaId })
     cancelAnimeDownloadsForMedia(mediaId)
 
     try {
@@ -630,7 +661,8 @@ export async function deleteAllAnimeDownloadsForMedia(mediaId: number): Promise<
             await deleteAsync(dir.uri, { idempotent: true })
         }
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to remove anime download directory", { mediaId }, error)
     }
 
     removeAllAnimeDownloadsForMedia(mediaId)
@@ -651,6 +683,8 @@ export function getAnimeDownloadDiskUsage(): number {
 }
 
 export async function clearAllAnimeDownloads(): Promise<void> {
+    const queuedCount = queuedDownloads.length
+    const activeCount = activeDownloads.size
     for (const queued of queuedDownloads.splice(0, queuedDownloads.length)) {
         queued.resolve()
     }
@@ -668,10 +702,12 @@ export async function clearAllAnimeDownloads(): Promise<void> {
             await deleteAsync(dir.uri, { idempotent: true })
         }
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to clear anime download directory", error)
     }
 
     clearAllAnimeDownloadRecords()
+    log.info("Cleared all anime downloads", { queuedCount, activeCount })
 }
 
 ////////////////////////// Helpers

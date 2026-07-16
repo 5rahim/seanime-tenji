@@ -117,6 +117,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
                                 totalCount={inProgressPagination.totalCount}
                                 currentPage={inProgressPagination.page}
                                 onPageChange={inProgressPagination.setPage}
+                                logName="active anime downloads"
                             />
                         </View>
                     )}
@@ -145,6 +146,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
                                 totalCount={completedPagination.totalCount}
                                 currentPage={completedPagination.page}
                                 onPageChange={completedPagination.setPage}
+                                logName="downloaded episodes"
                             />
                         </View>
                     )}
@@ -180,6 +182,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
                                 totalCount={failedPagination.totalCount}
                                 currentPage={failedPagination.page}
                                 onPageChange={failedPagination.setPage}
+                                logName="failed anime downloads"
                             />
                         </View>
                     )}

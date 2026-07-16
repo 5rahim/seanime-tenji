@@ -125,6 +125,7 @@ export default function AnimeDownloadQueueScreen() {
                                     pageSize={QUEUE_PAGE_SIZE}
                                     currentPage={queuedDownloadsPagination.page}
                                     onPageChange={queuedDownloadsPagination.setPage}
+                                    logName="anime download queue"
                                 />
                             </View>
                         )}
@@ -157,6 +158,7 @@ export default function AnimeDownloadQueueScreen() {
                                     pageSize={QUEUE_PAGE_SIZE}
                                     currentPage={failedQueuePagination.page}
                                     onPageChange={failedQueuePagination.setPage}
+                                    logName="failed anime downloads"
                                 />
                             </View>
                         )}

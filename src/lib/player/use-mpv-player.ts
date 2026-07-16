@@ -47,6 +47,16 @@ function getEpisodeLabel(source: MobilePlaybackSource): string | undefined {
     return displayTitle || episodeTitle || undefined
 }
 
+function getPlayerLogData(source: MobilePlaybackSource | null) {
+    if (!source) return {}
+    return {
+        sourceId: source.id,
+        streamKind: source.streamKind,
+        mediaId: source.mediaId,
+        episodeNumber: source.episodeNumber,
+    }
+}
+
 const INITIAL_STATE: PlayerState = {
     status: "idle",
     paused: true,
@@ -83,6 +93,10 @@ export function useMpvPlayer() {
     const [state, setState] = React.useState(INITIAL_STATE)
     const loadedSourceId = React.useRef<string | null>(null)
     const durationRef = React.useRef(0)
+    const bufferingStartedAtRef = React.useRef<number | null>(null)
+    const readyLoggedRef = React.useRef(false)
+    const eofLoggedRef = React.useRef(false)
+    const tracksLogRef = React.useRef<string | null>(null)
 
     // track whether we've applied auto-track + auto-play for the current source
     const hasAppliedDefaultTracks = React.useRef(false)
@@ -144,12 +158,22 @@ export function useMpvPlayer() {
 
         loadedSourceId.current = source.id
         durationRef.current = 0
+        bufferingStartedAtRef.current = null
+        readyLoggedRef.current = false
+        eofLoggedRef.current = false
+        tracksLogRef.current = null
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
         if (bufferingTimerRef.current !== null) {
             clearTimeout(bufferingTimerRef.current)
             bufferingTimerRef.current = null
         }
+        log.info("Loading player source", {
+            ...getPlayerLogData(source),
+            autoplay: shouldAutoplay,
+            resumePositionSec: source.resumePositionSec ?? 0,
+            subtitleCount: source.externalSubtitles?.length ?? 0,
+        })
         setState({ ...INITIAL_STATE, status: "loading", paused: !shouldAutoplay })
     }, [shouldAutoplay, source])
 
@@ -166,16 +190,19 @@ export function useMpvPlayer() {
     // Native event handlers (passed as props to MpvPlayerView)
     // ---------------------------------------------------------------------------
     const onNativeLoad = React.useCallback((event: NativeEvent<OnLoadEventPayload>) => {
-        log.info("Native load event")
+        if (event.nativeEvent.url !== videoSource?.url) {
+            log.warning("Ignored native load event for a stale source")
+            return
+        }
 
-        if (event.nativeEvent.url !== videoSource?.url) return
+        log.info("Native player accepted source", getPlayerLogData(source))
 
         setState(current => {
             const nextPaused = !shouldAutoplay
             if (current.paused === nextPaused) return current
             return { ...current, paused: nextPaused }
         })
-    }, [shouldAutoplay, videoSource?.url])
+    }, [shouldAutoplay, source, videoSource?.url])
 
     const onNativeProgress = React.useCallback((event: NativeEvent<OnProgressEventPayload>) => {
         const { position, duration, cacheSeconds: _cache } = event.nativeEvent
@@ -191,15 +218,14 @@ export function useMpvPlayer() {
         const payload = event.nativeEvent
 
         // Handle isLoading with debounce to avoid spinner flashing during seeks.
-        // The native layer sends rapid isLoading true/false from MPV_EVENT_SEEK,
-        // paused-for-cache, and MPV_EVENT_PLAYBACK_RESTART. Debounce the true
-        // transition so short buffering bursts are invisible.
         if (payload.isLoading !== undefined) {
             if (payload.isLoading) {
                 // delay showing buffering by 300ms
-                if (bufferingTimerRef.current === null) {
+                if (bufferingTimerRef.current === null && bufferingStartedAtRef.current === null) {
                     bufferingTimerRef.current = setTimeout(() => {
                         bufferingTimerRef.current = null
+                        bufferingStartedAtRef.current = Date.now()
+                        log.info("Player buffering started", getPlayerLogData(source))
                         setState(s => s.status === "buffering" ? s : { ...s, status: "buffering" })
                     }, 300)
                 }
@@ -209,11 +235,28 @@ export function useMpvPlayer() {
                     clearTimeout(bufferingTimerRef.current)
                     bufferingTimerRef.current = null
                 }
+                if (bufferingStartedAtRef.current !== null) {
+                    log.info("Player buffering ended", {
+                        ...getPlayerLogData(source),
+                        durationMs: Date.now() - bufferingStartedAtRef.current,
+                    })
+                    bufferingStartedAtRef.current = null
+                }
                 setState(s => {
                     if (s.status !== "buffering" && s.status !== "idle" && s.status !== "loading") return s
                     return { ...s, status: "ready" }
                 })
             }
+        }
+
+        if (!readyLoggedRef.current && (payload.isReadyToSeek === true || payload.isLoading === false)) {
+            readyLoggedRef.current = true
+            log.success("Player ready", getPlayerLogData(source))
+        }
+
+        if (payload.eofReached === true && !eofLoggedRef.current) {
+            eofLoggedRef.current = true
+            log.info("Playback reached the end", getPlayerLogData(source))
         }
 
         setState(s => {
@@ -245,12 +288,12 @@ export function useMpvPlayer() {
 
             return next
         })
-    }, [])
+    }, [source])
 
     const onNativeError = React.useCallback((event: NativeEvent<OnErrorEventPayload>) => {
-        log.warning("Native error:", event.nativeEvent.error)
+        log.error("Native player error", getPlayerLogData(source), event.nativeEvent.error)
         setState(s => ({ ...s, status: "error" }))
-    }, [])
+    }, [source])
 
     const onNativePictureInPictureChange = React.useCallback((event: NativeEvent<OnPictureInPictureChangeEventPayload>) => {
         const { isActive } = event.nativeEvent
@@ -290,6 +333,17 @@ export function useMpvPlayer() {
                 title: c.title,
             }))
 
+            const tracksSignature = `${mappedAudio.length}:${mappedSubs.length}:${mappedChapters.length}`
+            if (tracksLogRef.current !== tracksSignature) {
+                tracksLogRef.current = tracksSignature
+                log.info("Player tracks loaded", {
+                    ...getPlayerLogData(source),
+                    audioTracks: mappedAudio.length,
+                    subtitleTracks: mappedSubs.length,
+                    chapters: mappedChapters.length,
+                })
+            }
+
             setState(s => {
                 const prefs = getPlayerPreferences()
                 const showSubtitles = prefs.showSubtitles
@@ -314,7 +368,7 @@ export function useMpvPlayer() {
                 log.warning("Failed to fetch tracks", e)
             }
         }
-    }, [])
+    }, [source])
 
     const handleNativeCommandError = React.useCallback((command: string, error: unknown) => {
         if (isMissingMpvViewError(error)) return

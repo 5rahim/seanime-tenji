@@ -271,7 +271,7 @@ export default function ProfileScreen() {
                         <ProfileMenuSection title="Streaming">
                             <ProfileMenuItem
                                 icon={activeStream.streamMode === "debrid" ? "cloud-outline" : "radio-outline"}
-                                label="Server Stream"
+                                label="Playback Session"
                                 detail={formatActiveStreamDetail(activeStream)}
                                 accessory={<ActiveStreamBadge status={activeStream.status} />}
                                 onPress={() => router.push("/(app)/(tabs)/(profile)/active-stream" as never)}
@@ -508,7 +508,7 @@ function formatDownloadMenuDetail({
 
 function formatActiveStreamDetail(activeStream: ActiveStreamSession): string {
     const mode = activeStream.streamMode === "debrid" ? "Debrid streaming" : "Torrent streaming"
-    const subtitle = activeStream.subtitle ? ` · ${activeStream.subtitle}` : ""
+    const subtitle = activeStream.subtitle ? ` (${activeStream.subtitle})` : ""
 
     return `${mode}${subtitle}`
 }

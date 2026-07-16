@@ -626,6 +626,13 @@ export function handleMangaDownloadAppStateChange(nextState: AppStateStatus): vo
         return
     }
 
+    if (activeDownloads.size > 0) {
+        log.info("Pausing manga downloads for app state", {
+            appState: nextState,
+            activeCount: activeDownloads.size,
+        })
+    }
+
     for (const tracker of activeDownloads.values()) {
         tracker.pausedForAppState = true
         tracker.cancelled = true
@@ -666,6 +673,7 @@ export function enqueueMangaChapterDownloads(
         || `Manga #${mediaId}`
     const coverImageUrl = entry.media?.coverImage?.large ?? entry.media?.coverImage?.large
 
+    let queuedCount = 0
     batchMangaDownloadStoreWrites(() => {
         saveMangaInfo({
             mediaId,
@@ -675,7 +683,7 @@ export function enqueueMangaChapterDownloads(
         })
 
         for (const ch of chapters) {
-            queueMangaChapterDownload({
+            const queued = queueMangaChapterDownload({
                 mediaId,
                 provider,
                 chapterId: ch.chapterId,
@@ -683,7 +691,16 @@ export function enqueueMangaChapterDownloads(
                 title: ch.title,
                 scanlator: ch.scanlator,
             })
+            if (queued) queuedCount++
         }
+    })
+
+    log.info("Manga chapter batch requested", {
+        mediaId,
+        provider,
+        requested: chapters.length,
+        queued: queuedCount,
+        skipped: chapters.length - queuedCount,
     })
 
     // start processing if not already
@@ -720,6 +737,7 @@ export function retryMangaChapterDownload(sUrl: string, chapter: DownloadedManga
 }
 
 export function retryFailedMangaDownloads(sUrl: string, chapters: DownloadedMangaChapter[]): void {
+    log.info("Retrying failed manga downloads", { count: chapters.length })
     serverUrl = sUrl
     batchMangaDownloadStoreWrites(() => {
         for (const chapter of chapters) {
@@ -758,6 +776,7 @@ export function resumeMangaChapterDownload(sUrl: string, chapter: DownloadedMang
 }
 
 export function resumeStalledMangaDownloads(sUrl: string, chapters: DownloadedMangaChapter[]): void {
+    log.info("Resuming stalled manga downloads", { count: chapters.length })
     serverUrl = sUrl
     batchMangaDownloadStoreWrites(() => {
         for (const chapter of chapters) {
@@ -770,6 +789,8 @@ export function resumeStalledMangaDownloads(sUrl: string, chapters: DownloadedMa
  * Cancel the current active download and clear the queue.
  */
 export function cancelAllMangaDownloads(): void {
+    const queuedCount = downloadQueue.length
+    const activeCount = activeDownloads.size
     downloadQueue.length = 0
     for (const active of activeDownloads.values()) {
         active.cancelled = true
@@ -777,6 +798,7 @@ export function cancelAllMangaDownloads(): void {
             cancelManagedNativeDownload(downloadId)
         }
     }
+    log.info("Cancelled all manga downloads", { queuedCount, activeCount })
 }
 
 /**
@@ -805,10 +827,22 @@ export function cancelMangaChapterDownload(mediaId: number, provider: string, ch
         const dir = getChapterDir(mediaId, provider, chapterId)
         if (dir.exists) dir.delete()
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to remove cancelled manga chapter files", {
+            mediaId,
+            provider,
+            chapterId,
+        }, error)
     }
 
     removeDownloadedMangaChapter(mediaId, provider, chapterId)
+    log.info("Manga chapter download cancelled", {
+        mediaId,
+        provider,
+        chapterId,
+        wasQueued: qIdx >= 0,
+        wasActive: !!active,
+    })
 }
 
 /**
@@ -824,12 +858,15 @@ export function deleteMangaChapterDownload(mediaId: number, provider: string, ch
         const dir = getChapterDir(mediaId, provider, chapterId)
         if (dir.exists) dir.delete()
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to remove manga chapter files", { mediaId, provider, chapterId }, error)
     }
     removeDownloadedMangaChapter(mediaId, provider, chapterId)
+    log.info("Manga chapter download removed", { mediaId, provider, chapterId })
 }
 
 export async function deleteAllMangaDownloadsForMedia(mediaId: number): Promise<void> {
+    log.info("Removing all manga downloads for media", { mediaId })
     cancelMangaDownloadsForMedia(mediaId)
     try {
         const dir = getMediaDir(mediaId)
@@ -837,7 +874,8 @@ export async function deleteAllMangaDownloadsForMedia(mediaId: number): Promise<
             await deleteAsync(dir.uri, { idempotent: true })
         }
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to remove manga download directory", { mediaId }, error)
     }
     removeAllMangaDownloadsForMedia(mediaId)
 }
@@ -850,9 +888,11 @@ export async function clearAllMangaDownloads(): Promise<void> {
             await deleteAsync(dir.uri, { idempotent: true })
         }
     }
-    catch {
+    catch (error) {
+        log.warning("Failed to clear manga download directory", error)
     }
     clearAllMangaDownloadRecords()
+    log.info("Cleared all manga downloads")
 }
 
 /**

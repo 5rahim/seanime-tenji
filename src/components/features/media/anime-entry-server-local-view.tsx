@@ -170,6 +170,7 @@ export function AnimeEntryServerLocalView({
                     totalCount={section.totalCount}
                     currentPage={page}
                     onPageChange={p => setSectionPage(section.key, p)}
+                    logName={`server-local ${section.title}`}
                 />
             </View>
         )

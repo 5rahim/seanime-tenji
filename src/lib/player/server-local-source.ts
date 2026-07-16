@@ -76,6 +76,7 @@ export async function resolveServerLocalServerUrl(
 ): Promise<string | null> {
     const cached = resolutionCache.get(identity.key)
     if (cached && cached.expiresAt > Date.now()) {
+        log.info("Using cached server-local playback address", { serverOS: identity.os })
         return cached.serverUrl
     }
 
@@ -84,18 +85,30 @@ export async function resolveServerLocalServerUrl(
         normalizeServerLocalUrl(configuredServerUrl),
     ]))
 
-    for (const candidate of candidates) {
+    log.info("Probing server-local playback addresses", {
+        serverOS: identity.os,
+        candidateCount: candidates.length,
+    })
+
+    for (const [index, candidate] of candidates.entries()) {
         if (await probeServerUrl(candidate, identity)) {
             resolutionCache.set(identity.key, {
                 serverUrl: candidate,
                 expiresAt: Date.now() + RESOLUTION_CACHE_TTL_MS,
+            })
+            log.success("Resolved server-local playback address", {
+                serverOS: identity.os,
+                addressKind: index === 0 ? "loopback" : "configured",
             })
             return candidate
         }
     }
 
     resolutionCache.delete(identity.key)
-    log.warning("No matching mobile server responded to server-local playback")
+    log.warning("No matching mobile server responded to server-local playback", {
+        serverOS: identity.os,
+        candidateCount: candidates.length,
+    })
     return null
 }
 

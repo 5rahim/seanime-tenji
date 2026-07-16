@@ -453,6 +453,7 @@ export function usePlayerEventListener() {
     const streamSessionModeRef = React.useRef<StreamSessionMode | null>(null)
     const loadingFallbackTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const cancelManualTrackingTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const lastStreamStateLogRef = React.useRef<string | null>(null)
     const pendingInfo = useAtomValue(torrentStreamPendingInfoAtom)
     const streamSessionMode = useAtomValue(streamSessionModeAtom)
     React.useEffect(() => {
@@ -476,6 +477,25 @@ export function usePlayerEventListener() {
                 if (cancelManualTrackingTimer.current) {
                     clearTimeout(cancelManualTrackingTimer.current)
                     cancelManualTrackingTimer.current = null
+                }
+            }
+
+            const logStreamState = (mode: StreamSessionMode, state: string, failed = false, detail?: unknown) => {
+                const key = `${mode}:${state}`
+                if (lastStreamStateLogRef.current === key) return
+                lastStreamStateLogRef.current = key
+
+                const pending = pendingInfoRef.current
+                const context = {
+                    mode,
+                    state,
+                    mediaId: pending?.mediaId ?? null,
+                    episodeNumber: pending?.episodeNumber ?? null,
+                }
+                if (failed) {
+                    log.error("Stream state failed", context, detail)
+                } else {
+                    log.info("Stream state changed", context)
                 }
             }
 
@@ -507,7 +527,6 @@ export function usePlayerEventListener() {
                 if (typeof message?.type !== "string") return
 
                 if (message.type === "torrentstream-state") {
-                    log.info("WebSocket event received:", message.type, message.payload)
                     const payload = message.payload as TorrentStreamSocketPayload | undefined
                     if (typeof payload?.state !== "string") return
 
@@ -526,6 +545,7 @@ export function usePlayerEventListener() {
                             setTorrentStatus(null)
 
                             const next = parseTorrentStreamLoadingPayload(payload.data)
+                            logStreamState("torrent", `loading:${next.state ?? "unknown"}`)
                             setActiveStreamSession(current => updateActiveStreamSession(current, pendingInfoRef.current, "torrent", {
                                 status: "preparing",
                                 message: getTorrentStreamLoadingLabel(next.state, next.torrentBeingLoaded),
@@ -545,10 +565,12 @@ export function usePlayerEventListener() {
                         }
 
                         case "loading-failed":
+                            logStreamState("torrent", payload.state, true, payload.data)
                             resetTorrentStreamState()
                             return
 
                         case "loaded":
+                            logStreamState("torrent", payload.state)
                             setIsPreparing(true)
                             setTorrentIsLoaded(true)
                             setTorrentLoadingState("SENDING_STREAM_TO_MEDIA_PLAYER")
@@ -559,6 +581,7 @@ export function usePlayerEventListener() {
                             return
 
                         case "started-playing":
+                            logStreamState("torrent", payload.state)
                             setIsPreparing(false)
                             setTorrentIsLoaded(true)
                             setTorrentLoadingState(null)
@@ -570,6 +593,7 @@ export function usePlayerEventListener() {
                             return
 
                         case "status":
+                            logStreamState("torrent", payload.state)
                             setTorrentIsLoaded(true)
                             setTorrentStatus((payload.data as Torrentstream_TorrentStatus | undefined) ?? null)
                             setActiveStreamSession(current => updateActiveStreamSession(current, pendingInfoRef.current, "torrent", {
@@ -579,6 +603,7 @@ export function usePlayerEventListener() {
                             return
 
                         case "stopped":
+                            logStreamState("torrent", payload.state)
                             resetTorrentStreamState()
                             return
 
@@ -588,7 +613,6 @@ export function usePlayerEventListener() {
                 }
 
                 if (message.type === "debrid-stream-state") {
-                    log.info("WebSocket event received:", message.type, message.payload)
                     const payload = message.payload as DebridClient_StreamState | undefined
                     if (!payload?.status) return
 
@@ -604,6 +628,7 @@ export function usePlayerEventListener() {
                         case "downloading":
                         case "started":
                         case "ready":
+                            logStreamState("debrid", payload.status)
                             setIsPreparing(true)
                             setDebridStreamState(payload)
                             setActiveStreamSession(current => updateActiveStreamSession(current, pendingInfoRef.current, "debrid", {
@@ -614,6 +639,7 @@ export function usePlayerEventListener() {
                             return
 
                         case "failed":
+                            logStreamState("debrid", payload.status, true, payload.message)
                             resetTorrentStreamState()
                             return
 
@@ -624,13 +650,17 @@ export function usePlayerEventListener() {
 
                 // externalPlayerLink torrent stream URL
                 if (message.type === "external-player-open-url") {
-                    log.info("WebSocket event received:", message.type, message.payload)
                     const payload = message.payload as ExternalPlayerOpenURLPayload
-                    log.info("Processing external-player-open-url:", payload)
                     if (!payload?.url) {
                         log.warning("external-player-open-url payload is missing URL")
                         return
                     }
+
+                    log.info("Stream playback URL received", {
+                        mediaId: payload.mediaId,
+                        episodeNumber: payload.episodeNumber,
+                        mode: pendingInfoRef.current?.streamMode ?? streamSessionModeRef.current ?? "torrent",
+                    })
                     if (typeof payload.mediaId !== "number" || typeof payload.episodeNumber !== "number") {
                         log.warning("external-player-open-url payload is missing mediaId or episodeNumber")
                         return
@@ -696,12 +726,19 @@ export function usePlayerEventListener() {
                     setLoadingMessage(null)
                     setError(null)
 
-                    log.info("Resolved playing source:", source)
+                    log.info("Stream playback source resolved", {
+                        id: source.id,
+                        streamKind: source.streamKind,
+                        mediaId: source.mediaId,
+                        episodeNumber: source.episodeNumber,
+                        hasMedia: !!source.media,
+                        hasEpisode: !!source.episode,
+                    })
 
                     // external player
                     const prefs = getPlayerPreferences()
                     if (prefs.externalPlayerTemplate) {
-                        log.info("Opening external player with template:", prefs.externalPlayerTemplate)
+                        log.info("Opening stream in external player")
                         openExternalPlayerURL(prefs.externalPlayerTemplate, resolvedUrl).then(opened => {
                             if (opened) {
                                 log.info("Successfully opened external player URL")

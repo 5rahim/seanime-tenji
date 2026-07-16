@@ -103,6 +103,7 @@ export function MangaEntryDownloadedView({ media }: MangaEntryDownloadedViewProp
                                 page={inProgressPagination.page}
                                 totalPages={inProgressPagination.totalPages}
                                 onPageChange={inProgressPagination.setPage}
+                                logName="active manga downloads"
                             />
                         </View>
                     )}
@@ -123,6 +124,7 @@ export function MangaEntryDownloadedView({ media }: MangaEntryDownloadedViewProp
                                 page={inProgressPagination.page}
                                 totalPages={inProgressPagination.totalPages}
                                 onPageChange={inProgressPagination.setPage}
+                                logName="active manga downloads"
                             />
                         </View>
                     )}
@@ -136,6 +138,7 @@ export function MangaEntryDownloadedView({ media }: MangaEntryDownloadedViewProp
                             page={completedPagination.page}
                             totalPages={completedPagination.totalPages}
                             onPageChange={completedPagination.setPage}
+                            logName="downloaded manga chapters"
                         />
                     )}
 
@@ -177,6 +180,7 @@ export function MangaEntryDownloadedView({ media }: MangaEntryDownloadedViewProp
                             page={completedPagination.page}
                             totalPages={completedPagination.totalPages}
                             onPageChange={completedPagination.setPage}
+                            logName="downloaded manga chapters"
                         />
                     )}
                 </>

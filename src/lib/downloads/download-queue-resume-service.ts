@@ -44,6 +44,10 @@ export function useDownloadQueueResumeService() {
                 Promise.resolve(resumeStalledMangaDownloads(serverUrl, stalledMangaDownloads)),
             ])
             lastResumeAtRef.current = Date.now()
+            log.success("Download queue resume finished", { reason })
+        }
+        catch (error) {
+            log.error("Download queue resume failed", { reason }, error)
         }
         finally {
             resumeInFlightRef.current = false

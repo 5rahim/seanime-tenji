@@ -178,6 +178,7 @@ export function AnimeEntryLibraryView({
                     totalCount={section.totalCount}
                     currentPage={page}
                     onPageChange={p => setSectionPage(section.key, p)}
+                    logName={`library ${section.title}`}
                 />
             </View>
         )
@@ -308,6 +309,7 @@ export function AnimeEpisodeSection({
                         totalCount={episodes.length}
                         currentPage={currentPage}
                         onPageChange={setCurrentPage}
+                        logName={title}
                     />
                 </View>
             )}

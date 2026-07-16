@@ -17,22 +17,36 @@ import { Alert } from "react-native"
 
 const log = logger("playback-coordinator")
 
+function sourceLogData(source: MobilePlaybackSource) {
+    return {
+        id: source.id,
+        streamKind: source.streamKind,
+        mediaId: source.mediaId,
+        episodeNumber: source.episodeNumber,
+        entryView: source.entryView ?? null,
+        subtitleCount: source.externalSubtitles?.length ?? 0,
+        hasHeaders: !!source.headers && Object.keys(source.headers).length > 0,
+    }
+}
+
 /**
  * If the user has configured an external player, open the URL in that app
  * and return true. Returns false when no external player is set.
  */
-async function tryOpenExternalPlayer(streamUrl: string): Promise<boolean> {
+async function tryOpenExternalPlayer(streamUrl: string, source: MobilePlaybackSource): Promise<boolean> {
     const prefs = getPlayerPreferences()
     if (!prefs.externalPlayerTemplate) return false
 
-    log.info("Opening external player")
+    log.info("Opening external player", sourceLogData(source))
 
     const opened = await openExternalPlayerURL(prefs.externalPlayerTemplate, streamUrl)
     if (!opened) {
+        log.warning("External player could not be opened; using the built-in player")
         toast.error("External player app not found")
         return false
     }
 
+    log.success("External player opened")
     return true
 }
 
@@ -57,6 +71,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
     const [, setError] = useAtom(playerErrorAtom)
 
     const openBuiltInPlayer = (source: MobilePlaybackSource) => {
+        log.info("Opening built-in player", sourceLogData(source))
         setError(null)
         setLoadingMessage(null)
         setSource(source)
@@ -67,6 +82,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
     // Local file playback
     const playLocalFileEpisode = (episode: Anime_Episode) => {
         if (!entry?.media) {
+            log.warning("Local playback stopped: media metadata is missing")
             toast.error("Media not available")
             return
         }
@@ -85,6 +101,13 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
         })
 
         if (!source) {
+            log.warning("Local playback source could not be resolved", {
+                mediaId: entry.media.id,
+                episodeNumber: episode.episodeNumber,
+                hasLocalFile: !!episode.localFile?.path,
+                isServerConnected,
+                hasServerUrl: !!serverUrl,
+            })
             if (!episode.localFile?.path) {
                 toast.error("No local file available for this episode")
             } else if (!isServerConnected || !serverUrl) {
@@ -96,14 +119,11 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
         }
 
         if (source.streamKind === "file") {
-            log.info(`Playing downloaded file: ${source.url}`)
             openBuiltInPlayer(source)
             return
-        } else {
-            log.info(`Starting local file playback: ${episode.localFile?.path ?? "unknown"}`)
         }
 
-        tryOpenExternalPlayer(source.url).then(opened => {
+        tryOpenExternalPlayer(source.url, source).then(opened => {
             if (opened) return
             openBuiltInPlayer(source)
         })
@@ -112,9 +132,19 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
     const playServerLocalFileEpisode = async (episode: Anime_Episode, serverLocalEntry?: Anime_Entry) => {
         const playbackEntry = serverLocalEntry ?? entry
         if (!playbackEntry?.media || !serverUrl || !serverLocalIdentity) {
+            log.warning("Server-local playback stopped: required server data is missing", {
+                hasMedia: !!playbackEntry?.media,
+                hasServerUrl: !!serverUrl,
+                hasIdentity: !!serverLocalIdentity,
+            })
             toast.error("Server-owned media is unavailable")
             return
         }
+
+        log.info("Resolving server-local playback", {
+            mediaId: playbackEntry.media.id,
+            episodeNumber: episode.episodeNumber,
+        })
 
         const source = await resolveServerLocalEpisodePlaybackSource({
             mediaId: playbackEntry.media.id,
@@ -127,6 +157,10 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
         })
 
         if (!source) {
+            log.warning("Server-local playback source could not be resolved", {
+                mediaId: playbackEntry.media.id,
+                episodeNumber: episode.episodeNumber,
+            })
             Alert.alert(
                 "Seanime Server unavailable",
                 "Start Seanime Server Mobile. Without internet, enable its offline mode before starting the server.",
@@ -134,11 +168,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
             return
         }
 
-        if (source.streamKind !== "file") {
-            log.info(`Starting server-local playback: ${episode.localFile?.path ?? "unknown"}`)
-        }
-
-        const opened = await tryOpenExternalPlayer(source.url)
+        const opened = await tryOpenExternalPlayer(source.url, source)
         if (opened) return
         openBuiltInPlayer(source)
     }
@@ -150,11 +180,10 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
         episode?: Anime_Episode
     }) => {
         if (!entry?.media) {
+            log.warning("Online playback stopped: media metadata is missing")
             toast.error("Media not available")
             return
         }
-
-        log.info(`Starting online stream playback: ep ${params.episodeNumber}`)
 
         const source = toSourceFromOnlineStream({
             videoSource: params.videoSource,
@@ -166,7 +195,14 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
             episodes: entry.episodes ?? undefined,
         })
 
-        tryOpenExternalPlayer(source.url).then(opened => {
+        log.info("Online stream source selected", {
+            ...sourceLogData(source),
+            server: params.videoSource.server,
+            quality: params.videoSource.quality,
+            type: params.videoSource.type,
+        })
+
+        tryOpenExternalPlayer(source.url, source).then(opened => {
             if (opened) return
             startOnlinePlayback(source)
         })
