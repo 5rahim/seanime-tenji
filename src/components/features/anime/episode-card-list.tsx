@@ -3,14 +3,13 @@ import { getEpisodePercentageComplete } from "@/api/hooks/continuity.hooks"
 import { useServerStatus } from "@/atoms/server.atoms"
 import { EpisodeCard } from "@/components/features/anime/episode-card"
 import { getEpisodeSpoilerState } from "@/lib/anime-spoilers"
-import { getEpisodeCardRowHeight, getEpisodeCardWidth } from "@/lib/responsive-card-layout"
+import { getEpisodeCardRowHeight, getEpisodeCardWidth, getHorizontalCardRenderCount } from "@/lib/responsive-card-layout"
 import React from "react"
 import { ActivityIndicator, FlatList, ListRenderItemInfo, Text, useWindowDimensions, View } from "react-native"
 
 const SPACING = 20
 const CONTENT_CONTAINER_STYLE = { paddingHorizontal: SPACING }
 const ITEM_SEPARATOR_STYLE = { width: SPACING }
-const INITIAL_EPISODE_CARD_RENDER = 3
 
 type EpisodeCardListProps = {
     title?: string
@@ -57,6 +56,12 @@ export function EpisodeCardList(props: EpisodeCardListProps) {
     const cardWidth = React.useMemo(() => getEpisodeCardWidth(screenWidth), [screenWidth])
     const cardRowHeight = React.useMemo(() => getEpisodeCardRowHeight(cardWidth), [cardWidth])
     const itemFullWidth = cardWidth + SPACING
+    const renderCount = React.useMemo(() => getHorizontalCardRenderCount({
+        viewportWidth: screenWidth,
+        cardWidth,
+        spacing: SPACING,
+        horizontalPadding: SPACING,
+    }), [cardWidth, screenWidth])
 
     const keyExtractor = React.useCallback((item: Anime_Episode, index: number) => {
         return item.localFile?.path || `${item.baseAnime?.id ?? "episode"}-${item.episodeNumber}-${index}`
@@ -118,8 +123,8 @@ export function EpisodeCardList(props: EpisodeCardListProps) {
                     contentContainerStyle={CONTENT_CONTAINER_STYLE}
                     ItemSeparatorComponent={EpisodeCardSeparator}
                     getItemLayout={getItemLayout}
-                    initialNumToRender={Math.min(episodes.length, INITIAL_EPISODE_CARD_RENDER)}
-                    maxToRenderPerBatch={INITIAL_EPISODE_CARD_RENDER}
+                    initialNumToRender={Math.min(episodes.length, renderCount)}
+                    maxToRenderPerBatch={renderCount}
                     windowSize={5}
                     removeClippedSubviews
                     snapToInterval={itemFullWidth}

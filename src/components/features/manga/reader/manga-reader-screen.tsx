@@ -613,11 +613,16 @@ export function MangaReaderScreen({ mediaId, provider, chapterId, chapterNumber 
         scrollToSpread(spreadState.currentSpreadIndex + 1)
     }, [scrollToSpread, spreadState.currentSpreadIndex])
 
-    const handleOpenNextChapter = React.useCallback(() => {
-        // try to sync before navigation so the finished chapter is not lost
+    const finishChapter = React.useCallback(() => {
         doSyncProgress()
-        navigateToChapter(nextChapter)
-    }, [doSyncProgress, navigateToChapter, nextChapter])
+
+        if (nextChapter) {
+            navigateToChapter(nextChapter)
+            return
+        }
+
+        router.back()
+    }, [doSyncProgress, navigateToChapter, nextChapter, router])
 
     const showUnavailableState = !currentChapterDownloaded && !isConnected
     const showLoading = !showUnavailableState && pages.length === 0 && pageContainerLoading
@@ -889,7 +894,7 @@ export function MangaReaderScreen({ mediaId, provider, chapterId, chapterNumber 
                                     />
 
                                     <Pressable
-                                        onPress={nextChapter ? handleOpenNextChapter : () => router.back()}
+                                        onPress={finishChapter}
                                         className="flex-row items-center gap-1.5 py-2 pl-4"
                                     >
                                         <Text className="text-xs font-medium text-white/40">

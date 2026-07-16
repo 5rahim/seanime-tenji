@@ -7,7 +7,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { BottomTabBarProps, BottomTabNavigationOptions } from "@react-navigation/bottom-tabs"
 import * as React from "react"
 import { ComponentProps } from "react"
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native"
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native"
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -19,17 +19,24 @@ export type AppTabConfig = {
     options?: BottomTabNavigationOptions
 }
 
+const BAR_MARGIN = 30
+const BAR_MAX_WIDTH = 560
+
 export function TabBar({ state, descriptors, navigation, tabs, user }: BottomTabBarProps & {
     tabs: AppTabConfig[],
     user: Status["user"] | undefined
 }) {
     const insets = useSafeAreaInsets()
+    const { width: screenWidth } = useWindowDimensions()
+    const availableWidth = Math.max(0, screenWidth - insets.left - insets.right)
+    const barWidth = Math.min(BAR_MAX_WIDTH, Math.max(0, availableWidth - 2 * BAR_MARGIN))
+    const barLeft = insets.left + (availableWidth - barWidth) / 2
     const bottomOffset = Platform.OS === "android"
         ? (insets.bottom > 0 ? insets.bottom + 10 : 10)
         : 20
 
     return (
-        <View style={[styles.tabBar, { bottom: bottomOffset }]}>
+        <View style={[styles.tabBar, { bottom: bottomOffset, left: barLeft, width: barWidth }]}>
             {state.routes.map((route, index) => {
                 const { options } = descriptors[route.key]
                 const tab = tabs.find(tab => tab.name === route.name)
@@ -164,7 +171,6 @@ const styles = StyleSheet.create({
         borderTopWidth: 0,
         borderRadius: 36,
         gap: 0,
-        marginHorizontal: 30,
         shadowOpacity: 0.1,
         shadowOffset: { width: 0, height: 10 },
         shadowRadius: 10,
