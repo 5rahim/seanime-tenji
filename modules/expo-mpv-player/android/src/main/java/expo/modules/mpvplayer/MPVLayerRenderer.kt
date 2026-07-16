@@ -13,6 +13,15 @@ import kotlin.math.log2
 
 private const val TAG = "MPVLayerRenderer"
 
+enum class VideoOutput(val mpvValue: String) {
+    GPU_NEXT("gpu-next"),
+    GPU("gpu");
+
+    companion object {
+        fun fromMpvValue(value: String): VideoOutput? = entries.firstOrNull { it.mpvValue == value }
+    }
+}
+
 /**
  * Core mpv wrapper for Android. Owns the mpv lifecycle, observes properties,
  * and forwards state changes to its delegate on the main thread.
@@ -71,6 +80,9 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
 
     private var initialized = false
     private var surface: Surface? = null
+
+    @Volatile
+    private var videoOutput: VideoOutput = VideoOutput.GPU_NEXT
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // -------------------------------------------------------------------
@@ -83,7 +95,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
         MPVLib.create(context)
 
         // video output
-        MPVLib.setOptionString("vo", "gpu")
+        MPVLib.setOptionString("vo", videoOutput.mpvValue)
         MPVLib.setOptionString("gpu-context", "android")
         MPVLib.setOptionString("opengl-es", "yes")
 
@@ -138,7 +150,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
         observeProperties()
 
         initialized = true
-        Log.d(TAG, "mpv started")
+        Log.i(TAG, "mpv started — requestedVo=${videoOutput.mpvValue}, activeVo=${getActiveVideoOutput()}")
     }
 
     fun stop() {
@@ -155,6 +167,31 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
         Log.d(TAG, "mpv stopped")
     }
 
+    /**
+     * Changes only mpv's video output. Recreating mpv here would discard the
+     * active source, playback position, selected tracks, and other live state.
+     */
+    fun setVideoOutput(output: VideoOutput) {
+        if (videoOutput == output) return
+
+        val previous = videoOutput
+        videoOutput = output
+
+        if (!initialized) {
+            Log.i(TAG, "Video output staged — from=${previous.mpvValue}, requestedVo=${output.mpvValue}")
+            return
+        }
+
+        Log.i(TAG, "Switching video output — from=${previous.mpvValue}, requestedVo=${output.mpvValue}")
+        try {
+            MPVLib.setPropertyString("vo", output.mpvValue)
+            Log.i(TAG, "Video output switched — requestedVo=${output.mpvValue}, activeVo=${getActiveVideoOutput()}")
+        } catch (e: Exception) {
+            videoOutput = previous
+            Log.e(TAG, "Failed to switch video output to ${output.mpvValue}", e)
+        }
+    }
+
     // -------------------------------------------------------------------
     // Surface management (Findroid approach)
     // -------------------------------------------------------------------
@@ -165,12 +202,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
         if (initialized) {
             MPVLib.attachSurface(surface)
             MPVLib.setPropertyString("force-window", "yes")
-            val activeVo = try {
-                MPVLib.getPropertyString("vo")
-            } catch (e: Exception) {
-                null
-            }
-            Log.i(TAG, "[PiP] attachSurface — attached, activeVo=$activeVo")
+            Log.i(TAG, "[PiP] attachSurface — attached, activeVo=${getActiveVideoOutput()}")
         }
     }
 
@@ -179,12 +211,16 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver {
         Log.i(TAG, "[PiP] detachSurface — initialized=$initialized")
         if (initialized) {
             MPVLib.detachSurface()
-            val activeVo = try {
-                MPVLib.getPropertyString("vo")
-            } catch (e: Exception) {
-                null
-            }
-            Log.i(TAG, "[PiP] detachSurface — detached, activeVo=$activeVo (should still be gpu)")
+            Log.i(TAG, "[PiP] detachSurface — detached, activeVo=${getActiveVideoOutput()}")
+        }
+    }
+
+    private fun getActiveVideoOutput(): String? {
+        if (!initialized) return videoOutput.mpvValue
+        return try {
+            MPVLib.getPropertyString("vo")
+        } catch (_: Exception) {
+            null
         }
     }
 

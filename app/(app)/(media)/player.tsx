@@ -915,6 +915,7 @@ function PlayerScreenInner() {
                         ref={player.viewRef}
                         source={player.videoSource}
                         nowPlayingMetadata={player.nowPlayingMetadata}
+                        {...(Platform.OS === "android" ? { videoOutput: prefs.androidVideoOutput } : {})}
                         onLoad={player.onNativeLoad}
                         onProgress={player.onNativeProgress}
                         onPlaybackStateChange={player.onNativePlaybackStateChange}

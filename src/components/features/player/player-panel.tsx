@@ -13,11 +13,13 @@ import {
     type WyzieSubtitleResult,
 } from "@/lib/player/subtitle-search"
 import { cn } from "@/lib/utils"
+import type { MpvVideoOutput } from "expo-mpv-player"
 import {
     Captions,
     Check,
     ChevronLeft,
     ChevronRight,
+    Cpu,
     Download,
     Gauge,
     Globe,
@@ -39,7 +41,7 @@ import {
     X,
 } from "lucide-react-native"
 import React from "react"
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from "react-native"
+import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from "react-native"
 import { Pressable } from "react-native-gesture-handler"
 import Animated, { SlideInRight, SlideOutRight } from "react-native-reanimated"
 import { AUDIO_DELAY_STEP, BRAND_ACCENT, BUTTON_SEEK_OPTIONS, SPEED_OPTIONS, SUBTITLE_DELAY_STEP, SUBTITLE_FONT_SIZE_OPTIONS } from "./constants"
@@ -58,6 +60,7 @@ const PANEL_META: Record<PlayerPanel, { title: string; icon?: React.ReactNode }>
     speed: { title: "Playback Speed", icon: <Gauge size={15} color={BRAND_ACCENT} /> },
     "seek-buttons": { title: "Forward / Back Seek", icon: <SkipForward size={15} color={BRAND_ACCENT} /> },
     "double-tap-seek": { title: "Double-Tap Seek", icon: <RotateCw size={15} color={BRAND_ACCENT} /> },
+    "video-output": { title: "Video Renderer", icon: <Cpu size={15} color={BRAND_ACCENT} /> },
     "subtitle-delay": { title: "Subtitle Delay", icon: <Timer size={15} color="#f59e0b" /> },
     "audio-delay": { title: "Audio Delay", icon: <Timer size={15} color="#a78bfa" /> },
     "subtitle-size": { title: "Subtitle Size", icon: <Type size={15} color={BRAND_ACCENT} /> },
@@ -219,6 +222,15 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
                             description="Choose how far a left or right double-tap jumps while watching."
                             onSelect={(seconds) => {
                                 updatePrefs({ doubleTapSeekSec: seconds })
+                                onClose()
+                            }}
+                        />
+                    )}
+                    {panel === "video-output" && (
+                        <VideoOutputContent
+                            current={prefs.androidVideoOutput}
+                            onSelect={(videoOutput) => {
+                                updatePrefs({ androidVideoOutput: videoOutput })
                                 onClose()
                             }}
                         />
@@ -419,6 +431,16 @@ function MainSettingsContent({
         },
     ]
 
+    if (Platform.OS === "android") {
+        rows.push({
+            label: "Video Renderer",
+            value: prefs.androidVideoOutput === "gpu-next" ? "Modern" : "Compatibility",
+            panel: "video-output",
+            icon: <Cpu size={15} color="rgba(255,255,255,0.6)" />,
+            accent: undefined,
+        })
+    }
+
     return (
         <View>
             <SettingsCard
@@ -562,6 +584,64 @@ function SeekAmountContent({ current, onSelect, description }: {
                                 {seconds === 3 && (
                                     <Text className="text-xs text-white/30">Default</Text>
                                 )}
+                            </View>
+                            {active && <Check size={14} color={BRAND_ACCENT} />}
+                        </PanelSelectableRow>
+                    )
+                })}
+            </View>
+        </View>
+    )
+}
+
+function VideoOutputContent({ current, onSelect }: {
+    current: MpvVideoOutput
+    onSelect: (videoOutput: MpvVideoOutput) => void
+}) {
+    const options: Array<{
+        value: MpvVideoOutput
+        label: string
+        description: string
+        badge: string
+    }> = [
+        {
+            value: "gpu-next",
+            label: "Modern",
+            description: "Uses gpu-next for better compatibility with newer Android versions.",
+            badge: "Recommended",
+        },
+        {
+            value: "gpu",
+            label: "Compatibility",
+            description: "Uses the legacy gpu renderer. Try this only if Modern has rendering issues.",
+            badge: "",
+        },
+    ]
+
+    return (
+        <View className="gap-3">
+            <View className={PANEL_CARD_CLASS}>
+                {options.map((option, index) => {
+                    const active = option.value === current
+                    return (
+                        <PanelSelectableRow
+                            key={option.value}
+                            active={active}
+                            borderTop={index > 0}
+                            onPress={() => onSelect(option.value)}
+                        >
+                            <View className="mr-3 min-w-0 flex-1 gap-1">
+                                <View className="flex-row items-center gap-2">
+                                    <Text className={cn("text-sm text-white", active && "font-semibold")}>
+                                        {option.label}
+                                    </Text>
+                                    <Text className="text-[10px] font-semibold uppercase tracking-wide text-white/30">
+                                        {option.badge}
+                                    </Text>
+                                </View>
+                                <Text className="text-xs leading-4 text-white/35">
+                                    {option.description}
+                                </Text>
                             </View>
                             {active && <Check size={14} color={BRAND_ACCENT} />}
                         </PanelSelectableRow>

@@ -15,6 +15,7 @@ export type {
     MpvVideoSource,
     MpvExternalSubtitle,
     NowPlayingMetadata,
+    MpvVideoOutput,
     SubtitleHorizontalAlignment,
     SubtitleVerticalAlignment,
     MpvPlayerViewRef,

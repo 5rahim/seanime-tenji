@@ -55,6 +55,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     private var intendedPlayState: Boolean = false
     private var surfaceReady: Boolean = false
     private var pendingConfig: VideoLoadConfig? = null
+    private var pendingVideoOutput: VideoOutput? = null
+    private var canApplyPendingSource: Boolean = false
     private var _isZoomedToFill: Boolean = false
     private var dispatchedPiPActive: Boolean = false
     private var dispatchedPaused: Boolean? = null
@@ -62,6 +64,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     private var rendererStarted: Boolean = false
     private var pendingSurface: Surface? = null
     private var surfaceTexture: SurfaceTexture? = null
+    private var surfaceWidth: Int = 0
+    private var surfaceHeight: Int = 0
 
     private var isWaitingForPiPTransition: Boolean = false
     private var isPiPSurfaceForced: Boolean = false
@@ -84,9 +88,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
         renderer = MPVLayerRenderer(context).also {
             it.delegate = this
-            it.start()
         }
-        rendererStarted = true
 
         pipController = PiPController(context, appContext).also {
             it.setPlayerView(textureView)
@@ -99,41 +101,78 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         val surface = Surface(surfaceTexture)
         surfaceTexture.setDefaultBufferSize(width, height)
         surfaceReady = true
+        surfaceWidth = width
+        surfaceHeight = height
 
         if (rendererStarted) {
             renderer?.attachSurface(surface)
+            renderer?.updateSurfaceSize(width, height)
         } else {
             pendingSurface = surface
         }
 
-        pendingConfig?.let { config ->
-            pendingConfig = null
-            loadVideoInternal(config)
-        }
+        applyPendingSourceR()
     }
 
     override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
         surfaceTexture.setDefaultBufferSize(width, height)
+        surfaceWidth = width
+        surfaceHeight = height
         renderer?.updateSurfaceSize(width, height)
     }
 
     override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         this.surfaceTexture = null
         surfaceReady = false
+        surfaceWidth = 0
+        surfaceHeight = 0
+        pendingSurface?.release()
+        pendingSurface = null
         renderer?.detachSurface()
         return false
     }
 
     override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {}
 
-    fun loadVideo(config: VideoLoadConfig) {
-        if (config.url == currentUrl) return
-
-        if (!surfaceReady) {
-            pendingConfig = config
+    fun stageVideoOutput(value: String) {
+        val output = VideoOutput.fromMpvValue(value)
+        if (output == null) {
+            Log.w(TAG, "Ignoring unsupported video output: $value")
             return
         }
+        pendingVideoOutput = output
+    }
 
+    fun stageVideo(config: VideoLoadConfig) {
+        if (config.url == currentUrl || config.url == pendingConfig?.url) return
+        pendingConfig = config
+        canApplyPendingSource = false
+    }
+
+    fun applyPendingProps() {
+        pendingVideoOutput?.let { output ->
+            pendingVideoOutput = null
+            renderer?.setVideoOutput(output)
+        }
+
+        if (!rendererStarted) {
+            renderer?.start()
+            rendererStarted = true
+            pendingSurface?.let { surface ->
+                pendingSurface = null
+                renderer?.attachSurface(surface)
+                renderer?.updateSurfaceSize(surfaceWidth, surfaceHeight)
+            }
+        }
+
+        canApplyPendingSource = true
+        applyPendingSourceR()
+    }
+
+    private fun applyPendingSourceR() {
+        if (!surfaceReady || !canApplyPendingSource) return
+        val config = pendingConfig ?: return
+        pendingConfig = null
         loadVideoInternal(config)
     }
 
@@ -477,6 +516,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         pipHandler.removeCallbacksAndMessages(null)
         pipController?.stopPictureInPicture()
         renderer?.stop()
+        pendingSurface?.release()
+        pendingSurface = null
         surfaceTexture = null
         surfaceReady = false
         renderer = null

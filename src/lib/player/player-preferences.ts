@@ -1,3 +1,4 @@
+import type { MpvVideoOutput } from "expo-mpv-player"
 import React from "react"
 import { createMMKV } from "react-native-mmkv"
 
@@ -52,6 +53,8 @@ export type PlayerPreferences = {
      * Null means use the built-in mpv player.
      */
     externalPlayerTemplate: string | null
+    /** mpv video output. gpu-next is the default. */
+    androidVideoOutput: MpvVideoOutput
 }
 
 const DEFAULTS: PlayerPreferences = {
@@ -74,6 +77,7 @@ const DEFAULTS: PlayerPreferences = {
     autoSkipOpEd: false,
     wyzieApiKey: "",
     externalPlayerTemplate: null,
+    androidVideoOutput: "gpu-next",
 }
 
 const STORAGE_KEY = "player-prefs"

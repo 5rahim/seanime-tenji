@@ -8,6 +8,7 @@ export type PlayerPanel =
     | "speed"
     | "seek-buttons"
     | "double-tap-seek"
+    | "video-output"
     | "subtitle-delay"
     | "audio-delay"
     | "subtitle-size"

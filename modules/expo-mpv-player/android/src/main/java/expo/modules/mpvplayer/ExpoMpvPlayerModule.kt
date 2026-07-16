@@ -76,6 +76,10 @@ class ExpoMpvPlayerModule : Module() {
         }
 
         View(MpvPlayerView::class) {
+            Prop("videoOutput") { view: MpvPlayerView, value: String ->
+                view.stageVideoOutput(value)
+            }
+
             Prop("source") { view: MpvPlayerView, source: Map<String, Any?>? ->
                 if (source == null) return@Prop
                 val url = source["url"] as? String ?: return@Prop
@@ -103,11 +107,12 @@ class ExpoMpvPlayerModule : Module() {
                     startPosition = startPosition,
                     autoplay = autoplay
                 )
-                view.loadVideo(config)
+                view.stageVideo(config)
             }
 
             OnViewDidUpdateProps { view ->
                 activeView = view
+                view.applyPendingProps()
             }
 
             // playback

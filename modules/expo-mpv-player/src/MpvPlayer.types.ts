@@ -18,6 +18,7 @@ export type NowPlayingMetadata = {
 
 export type SubtitleHorizontalAlignment = "left" | "center" | "right"
 export type SubtitleVerticalAlignment = "top" | "center" | "bottom"
+export type MpvVideoOutput = "gpu-next" | "gpu"
 
 /**
  * Fully-resolved playback source passed to the native view via the `source` prop.
@@ -168,6 +169,7 @@ type NativeEvent<T> = { nativeEvent: T }
 export type MpvPlayerViewProps = ViewProps & {
     source?: MpvVideoSource
     nowPlayingMetadata?: NowPlayingMetadata
+    videoOutput?: MpvVideoOutput
     onLoad?: (event: NativeEvent<OnLoadEventPayload>) => void
     onProgress?: (event: NativeEvent<OnProgressEventPayload>) => void
     onPlaybackStateChange?: (event: NativeEvent<OnPlaybackStateChangePayload>) => void
