@@ -536,7 +536,8 @@ export async function startBatchDownload(
     saveAnimeDownloadEntrySnapshot(entry)
 
     const pendingEpisodes = episodes.filter(episode => {
-        const episodeId = getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber)
+        // Extra episodes include the local path in their stored id
+        const episodeId = getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber, episode.localFile?.path)
         if (activeDownloads.has(dlKey(entry.mediaId, episodeId)) || hasQueuedAnimeDownload(entry.mediaId, episodeId)) {
             return false
         }

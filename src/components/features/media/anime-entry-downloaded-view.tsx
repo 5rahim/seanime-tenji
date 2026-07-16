@@ -15,11 +15,9 @@ import {
     useDeleteAnimeDownload,
     useDownloadedEpisodesForMedia,
 } from "@/lib/downloads"
-import { currentPlaybackSourceAtom, playerErrorAtom, playerLoadingMessageAtom, playerOpenAtom } from "@/lib/player"
+import { usePlaybackCoordinator } from "@/lib/player"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { Ionicons } from "@expo/vector-icons"
-import { useRouter } from "expo-router"
-import { useAtom } from "jotai"
 import * as React from "react"
 import { Alert, Pressable, Text, useWindowDimensions, View } from "react-native"
 
@@ -61,6 +59,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
     })
     const deleteDownload = useDeleteAnimeDownload()
     const deleteAll = useDeleteAllAnimeDownloadsForMedia()
+    const { playFileSource } = usePlaybackCoordinator(entry)
 
     const totalSize = React.useMemo(() => {
         return completedEpisodes.reduce((acc, ep) => acc + ep.fileSize, 0)
@@ -160,6 +159,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
                                 thumbnailWidth={downloadedThumbnailWidth}
                                 isFirst={index === 0}
                                 isLast={index === completedPagination.pagedItems.length - 1}
+                                onPlay={playFileSource}
                                 onDelete={() => deleteDownload(episode.mediaId, episode.aniDBEpisode)}
                             />
                         ))}
@@ -196,6 +196,7 @@ export function AnimeEntryDownloadedView({ entry }: AnimeEntryDownloadedViewProp
                                 thumbnailWidth={downloadedThumbnailWidth}
                                 isFirst={index === 0}
                                 isLast={index === failedPagination.pagedItems.length - 1}
+                                onPlay={playFileSource}
                                 onDelete={() => deleteDownload(episode.mediaId, episode.aniDBEpisode)}
                             />
                         ))}
@@ -282,6 +283,7 @@ type DownloadedEpisodeRowProps = {
     thumbnailWidth: number
     isFirst: boolean
     isLast: boolean
+    onPlay: (source: MobilePlaybackSource) => Promise<void>
     onDelete: () => void
 }
 
@@ -307,15 +309,9 @@ function DownloadedEpisodeListItem({
     thumbnailWidth,
     isFirst,
     isLast,
+    onPlay,
     onDelete,
 }: DownloadedEpisodeRowProps) {
-    const router = useRouter()
-
-    const [, setSource] = useAtom(currentPlaybackSourceAtom)
-    const [, setPlayerOpen] = useAtom(playerOpenAtom)
-    const [, setError] = useAtom(playerErrorAtom)
-    const [, setLoadingMessage] = useAtom(playerLoadingMessageAtom)
-
     const isCompleted = episode.status === "completed"
     const isFailed = episode.status === "failed"
     const matchingEpisode = React.useMemo(() => {
@@ -346,12 +342,8 @@ function DownloadedEpisodeListItem({
             episodes: entry.episodes ?? undefined,
         }
 
-        setError(null)
-        setLoadingMessage(null)
-        setSource(source)
-        setPlayerOpen(true)
-        router.push("/(app)/(media)/player" as never)
-    }, [isCompleted, entry, episode, matchingEpisode, router, setSource, setPlayerOpen, setError, setLoadingMessage])
+        onPlay(source)
+    }, [isCompleted, entry, episode, matchingEpisode, onPlay])
 
     const handleLongPress = React.useCallback(() => {
         Alert.alert(

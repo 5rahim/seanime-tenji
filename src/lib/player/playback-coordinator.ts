@@ -79,6 +79,13 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
         router.push("/(app)/(media)/player" as never)
     }
 
+    // applies the saved player preference and opens the built-in player when the handoff fails.
+    const playFileSource = async (source: MobilePlaybackSource) => {
+        const opened = await tryOpenExternalPlayer(source.url, source)
+        if (opened) return
+        openBuiltInPlayer(source)
+    }
+
     // Local file playback
     const playLocalFileEpisode = (episode: Anime_Episode) => {
         if (!entry?.media) {
@@ -118,15 +125,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
             return
         }
 
-        if (source.streamKind === "file") {
-            openBuiltInPlayer(source)
-            return
-        }
-
-        tryOpenExternalPlayer(source.url, source).then(opened => {
-            if (opened) return
-            openBuiltInPlayer(source)
-        })
+        playFileSource(source)
     }
 
     const playServerLocalFileEpisode = async (episode: Anime_Episode, serverLocalEntry?: Anime_Entry) => {
@@ -168,9 +167,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
             return
         }
 
-        const opened = await tryOpenExternalPlayer(source.url, source)
-        if (opened) return
-        openBuiltInPlayer(source)
+        await playFileSource(source)
     }
 
     // Online stream playback
@@ -209,6 +206,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
     }
 
     return {
+        playFileSource,
         playLocalFileEpisode,
         playServerLocalFileEpisode,
         playOnlineStreamEpisode,

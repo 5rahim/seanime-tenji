@@ -147,6 +147,17 @@ export function getExternalPlayerPackageName(template: string): string | null {
 }
 
 export async function openExternalPlayerURL(template: string, streamUrl: string): Promise<boolean> {
+    // a downloaded file URL points into Seanime's private storage. we give the external player temporary access to the file
+    if (streamUrl.startsWith("file://")) {
+        if (Platform.OS === "android") {
+            return ExpoExternalPlayer.openFile(streamUrl, getExternalPlayerPackageName(template))
+        }
+
+        if (Platform.OS === "ios") {
+            return ExpoExternalPlayer.openFile(streamUrl)
+        }
+    }
+
     if (Platform.OS === "android") {
         const packageName = getExternalPlayerPackageName(template)
         if (packageName) {

@@ -16,8 +16,22 @@ function isEpisodeSelectionLocked(status: DownloadStatus | null | undefined): bo
     return status === "completed" || status === "downloading" || status === "pending"
 }
 
+// The download manager writes one record for each episode. Main episodes use
+// these fields for the ID, which prevents two matched files from creating two jobs.
 function getEpisodeDownloadId(episode: Anime_Episode): string {
     return getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber, episode.localFile?.path)
+}
+
+// Two server files can match one episode and both need a row in this modal.
+// Each file has its own selection, using the local path as its React key.
+function getEpisodeSelectionId(episode: Anime_Episode): string {
+    return episode.localFile?.path ?? getEpisodeDownloadId(episode)
+}
+
+// The file path is left out because this value is only used to count matches.
+// A count above one tells the row to show the filename.
+function getEpisodeMatchId(episode: Anime_Episode): string {
+    return getDownloadEpisodeId(episode.aniDBEpisode, episode.type, episode.episodeNumber)
 }
 
 type DownloadEpisodesModalProps = {
@@ -47,7 +61,16 @@ export function DownloadEpisodesModal({
 
     // only show episodes that have a local file on the server
     const _downloadableEpisodes = useMemo(() => {
-        const localFileEpisodes = episodes.filter(ep => ep.localFile?.path)
+        const seenPaths = new Set<string>()
+        const localFileEpisodes = episodes.filter(ep => {
+            const path = ep.localFile?.path
+
+            // multiple library folders can return the same file more than once
+            if (!path || seenPaths.has(path)) return false
+
+            seenPaths.add(path)
+            return true
+        })
 
         if (showNonMain) return localFileEpisodes
 
@@ -69,8 +92,16 @@ export function DownloadEpisodesModal({
     // pagination
     const totalPages = Math.max(1, Math.ceil(downloadableEpisodes.length / MODAL_PAGE_SIZE))
     const pagedEpisodes = downloadableEpisodes.slice(page * MODAL_PAGE_SIZE, (page + 1) * MODAL_PAGE_SIZE)
-    const downloadableEpisodeIds = useMemo(() => {
-        return new Set(downloadableEpisodes.map(getEpisodeDownloadId))
+    const downloadableEpisodesBySelectionId = useMemo(() => {
+        return new Map(downloadableEpisodes.map(ep => [getEpisodeSelectionId(ep), ep]))
+    }, [downloadableEpisodes])
+    const matchCountById = useMemo(() => {
+        const counts = new Map<string, number>()
+        for (const episode of downloadableEpisodes) {
+            const matchId = getEpisodeMatchId(episode)
+            counts.set(matchId, (counts.get(matchId) ?? 0) + 1)
+        }
+        return counts
     }, [downloadableEpisodes])
 
     React.useEffect(() => {
@@ -89,47 +120,63 @@ export function DownloadEpisodesModal({
             let changed = false
             const next = new Set<string>()
 
-            for (const episodeId of prev) {
-                if (!downloadableEpisodeIds.has(episodeId) || isEpisodeSelectionLocked(downloadStatusById.get(episodeId))) {
+            for (const selectionId of prev) {
+                const episode = downloadableEpisodesBySelectionId.get(selectionId)
+                if (!episode || isEpisodeSelectionLocked(downloadStatusById.get(getEpisodeDownloadId(episode)))) {
                     changed = true
                     continue
                 }
 
-                next.add(episodeId)
+                next.add(selectionId)
             }
 
             return changed ? next : prev
         })
-    }, [downloadStatusById, downloadableEpisodeIds])
+    }, [downloadStatusById, downloadableEpisodesBySelectionId])
 
-    const toggleEpisode = useCallback((episodeId: string) => {
+    const toggleEpisode = useCallback((episode: Anime_Episode) => {
+        const selectionId = getEpisodeSelectionId(episode)
+        const downloadId = getEpisodeDownloadId(episode)
+
         setSelectedIds(prev => {
             const next = new Set(prev)
-            if (next.has(episodeId)) {
-                next.delete(episodeId)
+            if (next.has(selectionId)) {
+                next.delete(selectionId)
             } else {
-                next.add(episodeId)
+                // The download manager can queue one job for this episode. Choosing another matched file replaces the current choice and
+                // changes the source for that job.
+                for (const candidate of downloadableEpisodes) {
+                    if (getEpisodeDownloadId(candidate) === downloadId) {
+                        next.delete(getEpisodeSelectionId(candidate))
+                    }
+                }
+                next.add(selectionId)
             }
             return next
         })
-    }, [])
+    }, [downloadableEpisodes])
 
     const visibleSelectedCount = useMemo(() => {
         return downloadableEpisodes.reduce((count, episode) => {
-            return count + (selectedIds.has(getEpisodeDownloadId(episode)) ? 1 : 0)
+            return count + (selectedIds.has(getEpisodeSelectionId(episode)) ? 1 : 0)
         }, 0)
     }, [downloadableEpisodes, selectedIds])
 
     const selectAll = useCallback(() => {
-        const ids = new Set(
-            downloadableEpisodes
-                .map(ep => ({
-                    episode: ep,
-                    episodeId: getEpisodeDownloadId(ep),
-                }))
-                .filter(({ episodeId }) => !isEpisodeSelectionLocked(downloadStatusById.get(episodeId)))
-                .map(({ episodeId }) => episodeId),
-        )
+        const ids = new Set<string>()
+        const selectedDownloadIds = new Set<string>()
+
+        // Select All queues one job for each episode. When several files match, the first available file is picked.
+        for (const episode of downloadableEpisodes) {
+            const downloadId = getEpisodeDownloadId(episode)
+            if (selectedDownloadIds.has(downloadId) || isEpisodeSelectionLocked(downloadStatusById.get(downloadId))) {
+                continue
+            }
+
+            selectedDownloadIds.add(downloadId)
+            ids.add(getEpisodeSelectionId(episode))
+        }
+
         setSelectedIds(ids)
     }, [downloadStatusById, downloadableEpisodes])
 
@@ -139,23 +186,40 @@ export function DownloadEpisodesModal({
 
     const selectUnwatched = useCallback(() => {
         const watchProgress = entry.listData?.progress ?? 0
-        const unwatched = downloadableEpisodes.filter(ep => {
-            const episodeId = getEpisodeDownloadId(ep)
-            if (isEpisodeSelectionLocked(downloadStatusById.get(episodeId))) return false
-            if (ep.type !== "main") return true
-            return ep.progressNumber > watchProgress
-        })
-        setSelectedIds(new Set(unwatched.map(getEpisodeDownloadId)))
+        const ids = new Set<string>()
+        const selectedDownloadIds = new Set<string>()
+
+        for (const episode of downloadableEpisodes) {
+            const downloadId = getEpisodeDownloadId(episode)
+            if (selectedDownloadIds.has(downloadId) || isEpisodeSelectionLocked(downloadStatusById.get(downloadId))) {
+                continue
+            }
+            if (episode.type === "main" && episode.progressNumber <= watchProgress) continue
+
+            selectedDownloadIds.add(downloadId)
+            ids.add(getEpisodeSelectionId(episode))
+        }
+
+        setSelectedIds(ids)
     }, [downloadStatusById, downloadableEpisodes, entry.listData?.progress])
 
     const unwatchedEpisodeIds = useMemo(() => {
         const watchProgress = entry.listData?.progress ?? 0
-        return new Set(downloadableEpisodes.filter(ep => {
-            const episodeId = getEpisodeDownloadId(ep)
-            if (isEpisodeSelectionLocked(downloadStatusById.get(episodeId))) return false
-            if (ep.type !== "main") return true
-            return ep.progressNumber > watchProgress
-        }).map(getEpisodeDownloadId))
+        const ids = new Set<string>()
+        const selectedDownloadIds = new Set<string>()
+
+        for (const episode of downloadableEpisodes) {
+            const downloadId = getEpisodeDownloadId(episode)
+            if (selectedDownloadIds.has(downloadId) || isEpisodeSelectionLocked(downloadStatusById.get(downloadId))) {
+                continue
+            }
+            if (episode.type === "main" && episode.progressNumber <= watchProgress) continue
+
+            selectedDownloadIds.add(downloadId)
+            ids.add(getEpisodeSelectionId(episode))
+        }
+
+        return ids
     }, [downloadStatusById, downloadableEpisodes, entry.listData?.progress])
 
     const allUnwatchedSelected = unwatchedEpisodeIds.size > 0
@@ -173,7 +237,7 @@ export function DownloadEpisodesModal({
 
     const handleDownload = useCallback(() => {
         const toDownload = downloadableEpisodes.filter(ep => {
-            const id = getEpisodeDownloadId(ep)
+            const id = getEpisodeSelectionId(ep)
             return selectedIds.has(id)
         })
         if (toDownload.length === 0) return
@@ -183,10 +247,14 @@ export function DownloadEpisodesModal({
     }, [downloadableEpisodes, selectedIds, startBatch, onOpenChange])
 
     const selectableEpisodeCount = useMemo(() => {
-        return downloadableEpisodes.reduce((count, episode) => {
-            const episodeId = getEpisodeDownloadId(episode)
-            return count + (isEpisodeSelectionLocked(downloadStatusById.get(episodeId)) ? 0 : 1)
-        }, 0)
+        const ids = new Set<string>()
+        for (const episode of downloadableEpisodes) {
+            const downloadId = getEpisodeDownloadId(episode)
+            if (!isEpisodeSelectionLocked(downloadStatusById.get(downloadId))) {
+                ids.add(downloadId)
+            }
+        }
+        return ids.size
     }, [downloadStatusById, downloadableEpisodes])
     const allSelected = selectedIds.size === selectableEpisodeCount && selectableEpisodeCount > 0
     const hasVisibleSelection = visibleSelectedCount > 0
@@ -317,16 +385,18 @@ export function DownloadEpisodesModal({
 
                     <View className="gap-1">
                         {pagedEpisodes.map(episode => {
-                            const episodeId = getEpisodeDownloadId(episode)
-                            const downloadStatus = downloadStatusById.get(episodeId) ?? null
+                            const selectionId = getEpisodeSelectionId(episode)
+                            const downloadId = getEpisodeDownloadId(episode)
+                            const downloadStatus = downloadStatusById.get(downloadId) ?? null
                             return (
                                 <DownloadEpisodeRow
-                                    key={episodeId}
+                                    key={selectionId}
                                     episode={episode}
                                     downloadStatus={downloadStatus}
-                                    selected={selectedIds.has(episodeId)}
+                                    selected={selectedIds.has(selectionId)}
+                                    showFileName={(matchCountById.get(getEpisodeMatchId(episode)) ?? 0) > 1}
                                     watchedProgress={entry.listData?.progress ?? 0}
-                                    onToggle={() => toggleEpisode(episodeId)}
+                                    onToggle={() => toggleEpisode(episode)}
                                 />
                             )
                         })}
@@ -341,6 +411,7 @@ type DownloadEpisodeRowProps = {
     episode: Anime_Episode
     downloadStatus: DownloadStatus | null
     selected: boolean
+    showFileName: boolean
     watchedProgress: number
     onToggle: () => void
 }
@@ -372,7 +443,7 @@ function DownloadFilterChip({ label, icon, selected = false, disabled = false, o
     )
 }
 
-function DownloadEpisodeRow({ episode, downloadStatus, selected, watchedProgress, onToggle }: DownloadEpisodeRowProps) {
+function DownloadEpisodeRow({ episode, downloadStatus, selected, showFileName, watchedProgress, onToggle }: DownloadEpisodeRowProps) {
     const serverStatus = useServerStatus()
     const thumbnailWidth = 80
     const isDownloaded = downloadStatus === "completed"
@@ -441,9 +512,9 @@ function DownloadEpisodeRow({ episode, downloadStatus, selected, watchedProgress
                     )}
                     Episode {episode.episodeNumber}
                 </Text>
-                {!!episode.episodeTitle && !spoiler.hideTitle && (
+                {!!(showFileName ? episode.localFile?.name : episode.episodeTitle) && !spoiler.hideTitle && (
                     <Text className="text-xs text-white/40 mt-0.5" numberOfLines={1}>
-                        {episode.episodeTitle}
+                        {showFileName ? episode.localFile?.name : episode.episodeTitle}
                     </Text>
                 )}
                 {isDownloaded && (

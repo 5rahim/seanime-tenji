@@ -1,7 +1,7 @@
 {
   "name": "expo-external-player",
   "version": "0.1.0",
-  "description": "Expo module for launching Android external video players",
+  "description": "Expo module for opening videos in external players",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {},
