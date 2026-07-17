@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...config,
     name: "Seanime",
     slug: "seanime-app",
-    version: "0.1.21",
+    version: "0.2.0",
     orientation: "portrait",
     icon: "./src/assets/images/icon.png",
     scheme: "seanime",
@@ -23,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
     },
     ios: {
-        buildNumber: "21",
+        buildNumber: "22",
         appleTeamId: process.env.EXPO_APPLE_TEAM_ID || "",
         supportsTablet: true,
         bundleIdentifier: process.env.EXPO_IOS_BUNDLE_ID || "app.seanime.tenji",
@@ -56,7 +56,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     android: {
         jsEngine: "hermes",
-        versionCode: 21,
+        versionCode: 22,
         usesCleartextTraffic: true,
         adaptiveIcon: {
             foregroundImage: "./src/assets/images/adaptive-icon.png",
