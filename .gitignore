@@ -96,7 +96,9 @@ credentials/
 TODO.md
 docs/
 scripts/
-tools/
+!tools/
+tools/*
+!tools/update-anilist-tags.mjs
 .*/
 !.github/
 .github/*

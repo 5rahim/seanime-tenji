@@ -17,6 +17,7 @@ import {
     AL_ListManga,
     AL_MangaCollection,
     AL_MangaDetailsById_Media,
+    AL_MediaTagMap,
     HibikeManga_SearchResult,
     Manga_ChapterContainer,
     Manga_Collection,
@@ -48,6 +49,15 @@ export function useGetRawAnilistMangaCollection() {
         method: API_ENDPOINTS.MANGA.GetRawAnilistMangaCollection.methods[0],
         queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollection.key],
         enabled: true,
+    })
+}
+
+export function useGetRawAnilistMangaCollectionTags(enabled: boolean = true) {
+    return useServerQuery<AL_MediaTagMap>({
+        endpoint: API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.endpoint,
+        method: API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.methods[0],
+        queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.key],
+        enabled,
     })
 }
 

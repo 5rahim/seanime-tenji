@@ -2,7 +2,7 @@ import { buildSeaQuery } from "@/api/client/requests"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { AL_ListAnime, AL_ListManga } from "@/api/generated/types"
 import { useServerUrl } from "@/atoms/server.atoms"
-import { getAnimeSearchVariables, getMangaSearchVariables, SearchParams } from "@/lib/search/search-atoms"
+import { getAnimeSearchVariables, getMangaSearchVariables, SearchParams } from "@/lib/search/search.atoms"
 import { logger } from "@/lib/utils/logger"
 import { useInfiniteQuery } from "@tanstack/react-query"
 

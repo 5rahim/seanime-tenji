@@ -1,7 +1,10 @@
 import { AL_BaseAnime, AL_MediaListStatus, Anime_ScheduleItem } from "@/api/generated/types"
 import { useGetAnimeCollectionSchedule } from "@/api/hooks/anime_collection.hooks"
+import { useGetMissingEpisodes, useGetUpcomingEpisodes } from "@/api/hooks/anime_entries.hooks"
 import { useAnilistAnimeEntryListDataAtom } from "@/atoms/anilist-collection.atoms"
 import { ScheduleSettings, scheduleSettingsAtom } from "@/atoms/schedule.atoms"
+import { useServerStatus } from "@/atoms/server.atoms"
+import { EpisodeCard } from "@/components/features/anime/episode-card"
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
 import { SafeView } from "@/components/layout/layout-view"
 import { TabFadeView } from "@/components/layout/tab-fade-view"
@@ -11,8 +14,10 @@ import { RowDivider } from "@/components/shared/row-divider"
 import { Surface } from "@/components/shared/surface"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { useIOSScrollRefreshRateWorkaround } from "@/hooks/use-ios-scroll-refresh-rate-workaround"
+import { getEpisodeSpoilerState, getSpoilerSafeAnimeImage } from "@/lib/anime-spoilers"
 import { useIsServerConnected } from "@/lib/offline"
-import { getMediaGridLayout } from "@/lib/responsive-card-layout"
+import { getHorizontalCardRenderCount, getMediaGridLayout } from "@/lib/responsive-card-layout"
+import { getShelfBadge, getShelfTitle, type ShelfEpisode } from "@/lib/schedule-episodes"
 import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { addDays, addWeeks, format, isSameDay, setMonth, setYear, startOfWeek, subWeeks } from "date-fns"
@@ -20,12 +25,14 @@ import { router } from "expo-router"
 import { useAtom } from "jotai/react"
 import sortBy from "lodash/sortBy"
 import * as React from "react"
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, useWindowDimensions, View } from "react-native"
 import Animated, { FadeIn } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 const GRID_SPACING = 10
 const GRID_PADDING = 14
+const SHELF_SPACING = 12
+const SHELF_PADDING = 16
 
 export default function ScheduleScreen() {
     const isConnected = useIsServerConnected()
@@ -35,6 +42,16 @@ export default function ScheduleScreen() {
         isFetching,
         refetch,
     } = useGetAnimeCollectionSchedule({ enabled: isConnected })
+    const {
+        data: missingEpisodes,
+        isFetching: missingFetching,
+        refetch: refetchMissing,
+    } = useGetMissingEpisodes(isConnected)
+    const {
+        data: upcomingEpisodes,
+        isFetching: upcomingFetching,
+        refetch: refetchUpcoming,
+    } = useGetUpcomingEpisodes(isConnected)
 
     useIOSScrollRefreshRateWorkaround()
 
@@ -87,6 +104,12 @@ export default function ScheduleScreen() {
 
     const selectedDateKey = format(selectedDate, "yyyy-MM-dd")
     const selectedDayEvents = eventsByDate.get(selectedDateKey) ?? []
+    const missing = settings.hideMissingEpisodes
+        ? []
+        : missingEpisodes?.episodes?.filter(episode => !!episode.baseAnime) ?? []
+    const upcoming = settings.hideUpcomingEpisodes
+        ? []
+        : upcomingEpisodes?.episodes?.filter(episode => !!episode.baseAnime) ?? []
 
     const monthYearLabel = format(addDays(currentWeekStart, 3), "yyyy MMMM")
 
@@ -120,47 +143,57 @@ export default function ScheduleScreen() {
 
     const refreshControl = isConnected ? (
         <RefreshControl
-            refreshing={isFetching && !isLoading}
-            onRefresh={() => void refetch()}
+            refreshing={(isFetching || missingFetching || upcomingFetching) && !isLoading}
+            onRefresh={() => void Promise.all([refetch(), refetchMissing(), refetchUpcoming()])}
             tintColor="rgba(255,255,255,0.45)"
         />
     ) : undefined
+
+    const listHeader = (
+        <>
+            <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
+                <Pressable onPress={goToToday} className="p-2" hitSlop={12}>
+                    <Ionicons name="today-outline" size={22} color="rgba(255,255,255,0.8)" />
+                </Pressable>
+
+                <View className="flex-row items-center gap-3">
+                    <Pressable onPress={goToPreviousWeek} hitSlop={12} className="p-1">
+                        <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.6)" />
+                    </Pressable>
+                    <Pressable onPress={() => setMonthPickerOpen(true)} hitSlop={8}>
+                        <Text className="text-base font-semibold text-white/90">{monthYearLabel}</Text>
+                    </Pressable>
+                    <Pressable onPress={goToNextWeek} hitSlop={12} className="p-1">
+                        <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
+                    </Pressable>
+                </View>
+
+                <Pressable onPress={() => setSettingsOpen(true)} className="p-2" hitSlop={12}>
+                    <Ionicons name="options-outline" size={22} color="rgba(255,255,255,0.8)" />
+                </Pressable>
+            </View>
+
+            <WeekDaySelector
+                weekDays={weekDays}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                getEventCount={getEventCount}
+            />
+        </>
+    )
+    const listFooter = missing.length > 0 || upcoming.length > 0
+        ? (
+            <View className="gap-5 pt-6 pb-8">
+                <ScheduleEpisodeShelf title="Missing Episodes" episodes={missing} />
+                <ScheduleEpisodeShelf title="Upcoming Episodes" episodes={upcoming} />
+            </View>
+        )
+        : null
 
     return (
         <TabFadeView>
             <SafeView>
                 <OfflineBanner />
-
-                <View className="flex-row items-center justify-between px-4 pt-2 pb-1">
-                    <Pressable onPress={goToToday} className="p-2" hitSlop={12}>
-                        <Ionicons name="today-outline" size={22} color="rgba(255,255,255,0.8)" />
-                    </Pressable>
-
-                    <View className="flex-row items-center gap-3">
-                        <Pressable onPress={goToPreviousWeek} hitSlop={12} className="p-1">
-                            <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.6)" />
-                        </Pressable>
-                        <Pressable onPress={() => setMonthPickerOpen(true)} hitSlop={8}>
-                            <Text className="text-base font-semibold text-white/90">
-                                {monthYearLabel}
-                            </Text>
-                        </Pressable>
-                        <Pressable onPress={goToNextWeek} hitSlop={12} className="p-1">
-                            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-                        </Pressable>
-                    </View>
-
-                    <Pressable onPress={() => setSettingsOpen(true)} className="p-2" hitSlop={12}>
-                        <Ionicons name="options-outline" size={22} color="rgba(255,255,255,0.8)" />
-                    </Pressable>
-                </View>
-
-                <WeekDaySelector
-                    weekDays={weekDays}
-                    selectedDate={selectedDate}
-                    onSelectDate={setSelectedDate}
-                    getEventCount={getEventCount}
-                />
 
                 {!isConnected ? (
                     <View className="flex-1 items-center justify-center px-8">
@@ -173,22 +206,14 @@ export default function ScheduleScreen() {
                     <View className="flex-1 items-center justify-center">
                         <ActivityIndicator color="rgba(255,255,255,0.4)" />
                     </View>
-                ) : selectedDayEvents.length === 0 ? (
-                    <ScrollView
-                        className="flex-1"
-                        contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 32 }}
-                        refreshControl={refreshControl}
-                    >
-                        <Ionicons name="calendar-outline" size={40} color="rgba(255,255,255,0.15)" />
-                        <Text className="text-white/30 text-sm mt-3 text-center">
-                            Nothing scheduled for {format(selectedDate, "EEEE, MMM d")}
-                        </Text>
-                    </ScrollView>
                 ) : (
                     <ScheduleGrid
                         events={selectedDayEvents}
                         settings={settings}
                         refreshControl={refreshControl}
+                        header={listHeader}
+                        footer={listFooter}
+                        emptyLabel={`Nothing scheduled for ${format(selectedDate, "EEEE, MMM d")}`}
                     />
                 )}
 
@@ -299,10 +324,16 @@ function ScheduleGrid({
     events,
     settings,
     refreshControl,
+    header,
+    footer,
+    emptyLabel,
 }: {
     events: ScheduleEvent[]
     settings: ScheduleSettings
     refreshControl: React.ReactElement<React.ComponentProps<typeof RefreshControl>> | undefined
+    header: React.ReactElement
+    footer: React.ReactElement | null
+    emptyLabel: string
 }) {
     const { width: screenWidth } = useWindowDimensions()
     const insets = useSafeAreaInsets()
@@ -337,6 +368,14 @@ function ScheduleGrid({
                 keyExtractor={(item) => `${item.mediaId}-${item.episodeNumber}-${item.dateTime}`}
                 renderItem={({ item }) => (
                     <ScheduleCardWrapper item={item} settings={settings} cardWidth={cardWidth} />
+                )}
+                ListHeaderComponent={header}
+                ListFooterComponent={footer}
+                ListEmptyComponent={(
+                    <View className="items-center justify-center px-8 py-14">
+                        <Ionicons name="calendar-outline" size={40} color="rgba(255,255,255,0.15)" />
+                        <Text className="text-white/30 text-sm mt-3 text-center">{emptyLabel}</Text>
+                    </View>
                 )}
                 getItemLayout={getItemLayout}
                 initialNumToRender={numColumns * 3}
@@ -416,6 +455,78 @@ function ScheduleCardWrapper({
     )
 }
 
+function ScheduleEpisodeShelf({ title, episodes }: { title: string; episodes: ShelfEpisode[] }) {
+    const { width } = useWindowDimensions()
+    const serverStatus = useServerStatus()
+    const blurAdultContent = !!serverStatus?.settings?.anilist?.blurAdultContent
+    const { animeEntryListData } = useAnilistAnimeEntryListDataAtom()
+    const cardWidth = React.useMemo(() => Math.max(160, Math.floor(Math.min(width * 0.54, 240))), [width])
+    const initialCount = React.useMemo(() => getHorizontalCardRenderCount({
+        viewportWidth: width,
+        cardWidth,
+        spacing: SHELF_SPACING,
+        horizontalPadding: SHELF_PADDING,
+    }), [cardWidth, width])
+
+    if (episodes.length === 0) return null
+
+    return (
+        <View className="gap-3">
+            <Text className="px-4 text-lg font-bold text-white">{title}</Text>
+            <FlatList
+                horizontal
+                data={episodes}
+                keyExtractor={(item) => `${title}-${item.baseAnime?.id}-${item.episodeNumber}`}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: SHELF_SPACING, paddingHorizontal: SHELF_PADDING }}
+                initialNumToRender={initialCount}
+                maxToRenderPerBatch={initialCount}
+                windowSize={5}
+                snapToInterval={cardWidth + SHELF_SPACING}
+                decelerationRate="fast"
+                disableIntervalMomentum
+                renderItem={({ item }) => {
+                    const media = item.baseAnime
+                    if (!media) return null
+
+                    const progress = animeEntryListData?.[String(media.id)]?.progress ?? 0
+                    const spoiler = getEpisodeSpoilerState(serverStatus, {
+                        episodeNumber: item.episodeNumber,
+                        watchedProgress: progress,
+                    })
+                    const episodeMeta = item.episodeMetadata
+                    const image = (spoiler.hideThumbnail
+                        ? getSpoilerSafeAnimeImage(media)
+                        : episodeMeta?.image || getSpoilerSafeAnimeImage(media)) || ""
+                    const badge = getShelfBadge(item)
+                    const episodeTitle = getShelfTitle(item, spoiler.hideTitle)
+                    const animeTitle = media.title?.userPreferred || media.title?.english || media.title?.romaji || ""
+
+                    return (
+                        <EpisodeCard
+                            cardWidth={cardWidth}
+                            image={image}
+                            imageBlurred={blurAdultContent && !!media.isAdult}
+                            title={episodeTitle}
+                            episodeNumber={item.episodeNumber}
+                            totalEpisodes={media.episodes}
+                            length={episodeMeta?.length}
+                            animeTitle={animeTitle}
+                            small
+                            onPress={() => router.push(`/(app)/entry/anime/${media.id}`)}
+                            thumbnailOverlay={badge ? (
+                                <View className="absolute left-2 top-2 rounded-md bg-black/75 px-2 py-1">
+                                    <Text className="text-[10px] font-semibold text-white/70">{badge}</Text>
+                                </View>
+                            ) : undefined}
+                        />
+                    )
+                }}
+            />
+        </View>
+    )
+}
+
 
 const STATUS_OPTIONS: { label: string; value: AL_MediaListStatus }[] = [
     { label: "Watching", value: "CURRENT" },
@@ -453,12 +564,26 @@ function ScheduleSettingsSheet({
         }))
     }
 
+    function toggleMissingEpisodes() {
+        onSettingsChange((prev) => ({
+            ...prev,
+            hideMissingEpisodes: !(prev.hideMissingEpisodes ?? false),
+        }))
+    }
+
+    function toggleUpcomingEpisodes() {
+        onSettingsChange((prev) => ({
+            ...prev,
+            hideUpcomingEpisodes: !(prev.hideUpcomingEpisodes ?? false),
+        }))
+    }
+
     return (
         <SeaBottomSheet
             open={open}
             onOpenChange={onOpenChange}
             title="Schedule settings"
-            snapPoints={["45%"]}
+            snapPoints={["65%"]}
         >
             <View className="gap-5">
                 <View className="gap-2">
@@ -492,6 +617,16 @@ function ScheduleSettingsSheet({
                         helper="Dim episodes you've already watched"
                         checked={settings.indicateWatchedEpisodes}
                         onToggle={toggleIndicateWatched}
+                    />
+                    <LabeledSwitch
+                        label="Hide missing episodes"
+                        checked={settings.hideMissingEpisodes ?? false}
+                        onToggle={toggleMissingEpisodes}
+                    />
+                    <LabeledSwitch
+                        label="Hide upcoming episodes"
+                        checked={settings.hideUpcomingEpisodes ?? false}
+                        onToggle={toggleUpcomingEpisodes}
                     />
                 </View>
             </View>

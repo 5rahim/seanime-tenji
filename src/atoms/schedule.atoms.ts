@@ -7,11 +7,17 @@ export type ScheduleSettings = {
     listStatuses: AL_MediaListStatus[]
     /** Grey out episodes the user has already watched */
     indicateWatchedEpisodes: boolean
+    /** Hide the missing episodes shelf */
+    hideMissingEpisodes: boolean
+    /** Hide the upcoming episodes shelf */
+    hideUpcomingEpisodes: boolean
 }
 
 const defaultSettings: ScheduleSettings = {
     listStatuses: ["CURRENT", "PLANNING", "COMPLETED", "PAUSED"],
     indicateWatchedEpisodes: true,
+    hideMissingEpisodes: false,
+    hideUpcomingEpisodes: false,
 }
 
 export const scheduleSettingsAtom = atomWithStorage<ScheduleSettings>(

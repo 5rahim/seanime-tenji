@@ -21,6 +21,7 @@ import type {
     HibikeTorrent_AnimeTorrent,
     HibikeTorrent_BatchEpisodeFiles,
     LibraryExplorer_SuperUpdateFileOptions,
+    Manga_MangaSourceRefreshMode,
     Mediastream_StreamType,
     Models_AnilistSettings,
     Models_DebridSettings,
@@ -1145,6 +1146,18 @@ export type EditMALListEntryProgress_Variables = {
 /**
  * - Filepath: internal/handlers/manga.go
  * - Filename: manga.go
+ * - Endpoint: /api/v1/manga/source-refresh
+ * @description
+ * Route starts a background manga source refresh.
+ */
+export type StartMangaSourceRefresh_Variables = {
+    mode: Manga_MangaSourceRefreshMode
+    mediaIds?: Array<number>
+}
+
+/**
+ * - Filepath: internal/handlers/manga.go
+ * - Filename: manga.go
  * - Endpoint: /api/v1/manga/anilist/collection
  * @description
  * Route returns the user's AniList manga collection.
@@ -1289,6 +1302,18 @@ export type UpdateMangaProgress_Variables = {
 export type MangaManualSearch_Variables = {
     provider: string
     query: string
+}
+
+/**
+ * - Filepath: internal/handlers/manga.go
+ * - Filename: manga.go
+ * - Endpoint: /api/v1/manga/manual-mapping/preview
+ * @description
+ * Route returns a chapter summary for a manual manga mapping.
+ */
+export type PreviewMangaMapping_Variables = {
+    provider: string
+    mangaId: string
 }
 
 /**
@@ -1609,6 +1634,7 @@ export type GetOnlineStreamEpisodeSource_Variables = {
     mediaId: number
     provider: string
     dubbed: boolean
+    refresh?: boolean
 }
 
 /**

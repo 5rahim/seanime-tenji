@@ -1,7 +1,10 @@
-import type { Anime_Episode } from "@/api/generated/types"
+import { getClientIdentity } from "@/api/client/client-identity"
+import type { Anime_Episode, Onlinestream_VideoSource } from "@/api/generated/types"
 import { useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
+import { useGetTorrentstreamSettings, useTorrentstreamStartStream } from "@/api/hooks/torrentstream.hooks"
 import { animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/atoms/anime-entry.atoms"
 import { useServerUrl } from "@/atoms/server.atoms"
+import { selectedQualityAtom, selectedServerAtom } from "@/components/features/onlinestream/use-onlinestream-controller"
 import { NEXT_EPISODE_CONFIRM_PROGRESS_THRESHOLD, NEXT_EPISODE_CONFIRM_REMAINING_SECONDS } from "@/components/features/player/constants"
 import { clamp, formatTime, getChapterAtTime, getFillZoomScale, getSourceVideoAspectRatio } from "@/components/features/player/helpers"
 import { useAutoNextEpisode } from "@/components/features/player/hooks/use-auto-next-episode"
@@ -24,6 +27,7 @@ import {
     currentPlaybackSourceAtom,
     playerErrorAtom,
     playerLoadingMessageAtom,
+    switchOnlineSource,
     useActivePlaybackSource,
     useCleanupPlaybackSession,
 } from "@/lib/player"
@@ -121,6 +125,8 @@ function PlayerScreenInner() {
     const source = useActivePlaybackSource()
     const [, setSource] = useAtom(currentPlaybackSourceAtom)
     const [, setPlaybackIntent] = useAtom(animeEntryPlaybackIntentAtom)
+    const [, setOnlineServer] = useAtom(selectedServerAtom)
+    const [, setOnlineQuality] = useAtom(selectedQualityAtom)
     const loadingMessage = useAtomValue(playerLoadingMessageAtom)
     const error = useAtomValue(playerErrorAtom)
     const [nextEpisodePrompt, setNextEpisodePrompt] = React.useState<NextEpisodePrompt | null>(null)
@@ -228,6 +234,32 @@ function PlayerScreenInner() {
         : !source?.media?.episodes || source.episodeNumber >= source.media.episodes
             ? null
             : source.episodeNumber + 1
+    const canPreloadTorrent = source?.nextEpisodeAction === "torrentstream-auto-select"
+    const { data: torrentstreamSettings } = useGetTorrentstreamSettings(canPreloadTorrent)
+    const { mutate: preloadTorrentStream } = useTorrentstreamStartStream({ muteError: true })
+    const preloadedEpisodeRef = React.useRef<string | null>(null)
+
+    React.useEffect(() => {
+        if (!source || !nextEpisode?.aniDBEpisode || !canPreloadTorrent || !isServerConnected) return
+        if (!torrentstreamSettings?.preloadNextStream || state.duration <= 0) return
+        if (state.currentTime / state.duration < 0.5) return
+
+        const key = `${source.id}:${nextEpisode.episodeNumber}`
+        if (preloadedEpisodeRef.current === key) return
+        preloadedEpisodeRef.current = key
+
+        preloadTorrentStream({
+            mediaId: source.mediaId,
+            episodeNumber: nextEpisode.episodeNumber,
+            aniDBEpisode: nextEpisode.aniDBEpisode,
+            autoSelect: true,
+            playbackType: "externalPlayerLink",
+            clientId: getClientIdentity().clientId,
+            preload: true,
+        })
+    }, [canPreloadTorrent, isServerConnected, nextEpisode, preloadTorrentStream, source, state.currentTime, state.duration,
+        torrentstreamSettings?.preloadNextStream])
+
     const nextLocalPlaybackSource = React.useMemo(() => {
         if (!source || source.nextEpisodeAction !== "local-file" || !nextEpisode) return null
 
@@ -280,6 +312,10 @@ function PlayerScreenInner() {
     React.useEffect(() => controls.clearHideTimer, [controls.clearHideTimer])
 
     const doubleTap = useDoubleTapSeek()
+    // const storeLevel = React.useCallback((value: number) => {
+    //     updatePrefs({ playbackBrightness: value })
+    // }, [updatePrefs])
+    // const sideAdjust = useSideAdjust(prefs.playbackBrightness, storeLevel)
     const sideAdjust = useSideAdjust()
     const swipeSeek = useSwipeSeek()
 
@@ -784,6 +820,14 @@ function PlayerScreenInner() {
         updatePrefs({ speed })
     }
 
+    function handleVideoSource(videoSource: Onlinestream_VideoSource) {
+        if (!source || videoSource.url === source.onlineSource?.url) return
+
+        setOnlineServer(videoSource.server)
+        setOnlineQuality(videoSource.quality)
+        setSource(switchOnlineSource(source, videoSource, state.currentTime))
+    }
+
     function handleSubDelayChange(delta: number) {
         const v = Math.round((state.subtitleDelay + delta) * 10) / 10
         player.setSubtitleDelay(v)
@@ -1114,6 +1158,9 @@ function PlayerScreenInner() {
                         episodes={source?.episodes}
                         currentEpisodeNumber={source?.episodeNumber}
                         onPlayEpisode={handleEpisodeSelect}
+                        videoSources={source?.onlineSources}
+                        videoSource={source?.onlineSource}
+                        onSetVideoSource={handleVideoSource}
                     />
                 )}
             </View>

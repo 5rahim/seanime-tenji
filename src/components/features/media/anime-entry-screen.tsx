@@ -25,7 +25,6 @@ import * as React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { InteractionManager, RefreshControl, View } from "react-native"
 import Animated, { FadeIn, useSharedValue } from "react-native-reanimated"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 type AnimeEntryScreenProps = {
     initialView?: AnimeEntryView
@@ -64,7 +63,6 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
     const { id, entry, isFetching, refetch } = useAnimeEntryScreen()
     const [playbackIntent, setPlaybackIntent] = useAtom(animeEntryPlaybackIntentAtom)
     const isFocused = useIsFocused()
-    const insets = useSafeAreaInsets()
     const serverStatus = useServerStatus()
     const connectionState = useServerConnectionState()
     const isConnected = useIsServerConnected()
@@ -417,7 +415,6 @@ export function AnimeEntryScreen({ initialView = "library" }: AnimeEntryScreenPr
             <AnimeEntryViewSwitcher
                 currentView={currentView}
                 onViewChange={setCurrentView}
-                bottomInset={insets.bottom}
                 isOffline={isOffline}
                 hiddenViews={hiddenViews}
             />

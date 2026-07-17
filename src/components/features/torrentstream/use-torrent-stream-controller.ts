@@ -944,6 +944,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         startPreviousBatchStream,
         streamMode,
         torrents: searchData?.torrents ?? [],
+        torrentCache: searchData?.debridInstantAvailability,
         torrentMetadataByInfoHash,
         torrentstreamSettings: serverStatus?.torrentstreamSettings,
         canUsePreviousBatch,

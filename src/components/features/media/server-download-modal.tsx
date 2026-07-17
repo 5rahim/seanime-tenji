@@ -317,6 +317,7 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
                 smartSearchFilters={torrentStream.smartSearchFilters}
                 supportsSmartSearch={torrentStream.selectedProviderSupportsSmartSearch}
                 torrents={torrentStream.torrents}
+                torrentCache={torrentStream.torrentCache}
                 torrentMetadataByInfoHash={torrentStream.torrentMetadataByInfoHash}
                 usePreviousBatch={torrentStream.usePreviousBatch}
                 resolution={torrentStream.resolution}

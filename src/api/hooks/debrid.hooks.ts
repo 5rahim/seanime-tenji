@@ -1,3 +1,4 @@
+import { LONG_REQUEST_TIMEOUT_MS } from "@/api/client/request-control"
 import { useServerMutation, useServerQuery } from "@/api/client/requests"
 import {
     DebridAddTorrents_Variables,
@@ -124,6 +125,7 @@ export function useDebridStartStream() {
         endpoint: API_ENDPOINTS.DEBRID.DebridStartStream.endpoint,
         method: API_ENDPOINTS.DEBRID.DebridStartStream.methods[0],
         mutationKey: [API_ENDPOINTS.DEBRID.DebridStartStream.key],
+        timeoutMs: LONG_REQUEST_TIMEOUT_MS,
         onSuccess: async () => {
         },
     })

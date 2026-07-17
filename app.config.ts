@@ -26,7 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         buildNumber: "21",
         appleTeamId: process.env.EXPO_APPLE_TEAM_ID || "",
         supportsTablet: true,
-        bundleIdentifier: "app.seanime.tenji",
+        bundleIdentifier: process.env.EXPO_IOS_BUNDLE_ID || "app.seanime.tenji",
         infoPlist: {
             NSLocalNetworkUsageDescription: "Seanime needs local network access to connect to your server on your home network.",
             UIBackgroundModes: [
@@ -102,4 +102,3 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         reactCompiler: true,
     },
 });
-

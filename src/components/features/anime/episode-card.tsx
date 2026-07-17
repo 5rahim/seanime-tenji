@@ -16,6 +16,7 @@ type EpisodeCardProps = {
     disabled?: boolean
     thumbnailOverlay?: React.ReactNode
     animeTitle?: string
+    small?: boolean
 }
 
 export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardProps) {
@@ -32,6 +33,7 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
         disabled,
         thumbnailOverlay,
         animeTitle,
+        small,
     } = props
     const { width: screenWidth } = useWindowDimensions()
     const resolvedCardWidth = cardWidth ?? getEpisodeCardWidth(screenWidth)
@@ -42,7 +44,10 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
             disabled={disabled || !onPress}
         >
             <View style={{ width: resolvedCardWidth }}>
-                <View className="relative mb-2" style={{ borderRadius: 12, overflow: "hidden" }}>
+                <View
+                    className={small ? "relative mb-1.5" : "relative mb-2"}
+                    style={{ borderRadius: 12, overflow: "hidden" }}
+                >
                     <SeaImage
                         source={{ uri: image }}
                         style={{ width: "100%", aspectRatio: 16 / 9 }}
@@ -64,7 +69,9 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
                 <Text
                     numberOfLines={1}
                     ellipsizeMode="tail"
-                    className="text-lg tracking-tight text-foreground font-semibold mb-1"
+                    className={small
+                        ? "text-sm tracking-tight text-foreground font-semibold mb-0.5"
+                        : "text-lg tracking-tight text-foreground font-semibold mb-1"}
                 >
                     {title}
                 </Text>
@@ -76,7 +83,7 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
                         className="flex flex-row flex-1 mr-2"
                     >
                         <Text
-                            className="text-foreground"
+                            className={small ? "text-xs text-foreground" : "text-foreground"}
                             numberOfLines={1}
                         >
                             Episode {episodeNumber}
@@ -94,7 +101,7 @@ export const EpisodeCard = React.memo(function EpisodeCard(props: EpisodeCardPro
                     </View>
 
                     {length && <Text
-                        className="text-muted-foreground shrink-0"
+                        className={small ? "text-xs text-muted-foreground shrink-0" : "text-muted-foreground shrink-0"}
                     >{length}m</Text>}
                 </View>
             </View>

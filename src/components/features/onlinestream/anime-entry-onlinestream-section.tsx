@@ -58,6 +58,7 @@ export function AnimeEntryOnlinestreamSection({ entry }: AnimeEntryOnlinestreamS
 
         playOnlineStreamEpisode({
             videoSource: controller.selectedVideoSource,
+            videoSources: controller.videoSources,
             episodeNumber: controller.playRequestedEpisode,
             episode: ep?.metadata,
         })
@@ -337,4 +338,3 @@ export function AnimeEntryOnlinestreamSection({ entry }: AnimeEntryOnlinestreamS
         </>
     )
 }
-

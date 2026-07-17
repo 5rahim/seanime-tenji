@@ -1,3 +1,4 @@
+import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import { requestServerLocalSync } from "@/lib/offline"
 import { logger } from "@/lib/utils/logger"
@@ -11,6 +12,8 @@ const WEBSOCKET_EVENTS = {
     SuccessToast: "success-toast",
     InfoToast: "info-toast",
     WarningToast: "warning-toast",
+    SettingsChanged: "settings-changed",
+    ServerLoggedOutAnilist: "server-logged-out-anilist",
     // collection refresh events
     RefreshedAnilistAnimeCollection: "refreshed-anilist-anime-collection",
     RefreshedAnilistMangaCollection: "refreshed-anilist-manga-collection",
@@ -39,11 +42,6 @@ const WEBSOCKET_EVENTS = {
     InvalidateQueries: "invalidate-queries",
 } as const
 
-type WebsocketServerEvent = {
-    type: string
-    payload?: unknown
-}
-
 type ActiveTorrentCountPayload = {
     downloading: number
     seeding: number
@@ -57,6 +55,7 @@ const animeCollectionRefreshKeys = [
     API_ENDPOINTS.ANILIST.GetAnimeCollection.key,
     API_ENDPOINTS.ANILIST.GetRawAnimeCollection.key,
     API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key,
+    API_ENDPOINTS.ANIME_ENTRIES.GetUpcomingEpisodes.key,
     API_ENDPOINTS.MANGA.GetMangaCollection.key,
     API_ENDPOINTS.ANIME_ENTRIES.GetAnimeEntry.key,
     API_ENDPOINTS.MANGA.GetMangaEntry.key,
@@ -133,6 +132,27 @@ const serverLocalInvalidationKeys = [
     API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key,
 ] as const
 
+const settingsChangedKeys = [
+    API_ENDPOINTS.SETTINGS.GetSettings.key,
+    API_ENDPOINTS.STATUS.GetStatus.key,
+    API_ENDPOINTS.MEDIASTREAM.GetMediastreamSettings.key,
+    API_ENDPOINTS.TORRENTSTREAM.GetTorrentstreamSettings.key,
+    API_ENDPOINTS.DEBRID.GetDebridSettings.key,
+] as const
+
+const anilistLogoutKeys = [
+    API_ENDPOINTS.STATUS.GetStatus.key,
+    API_ENDPOINTS.ANILIST.GetAnimeCollection.key,
+    API_ENDPOINTS.ANILIST.GetRawAnimeCollection.key,
+    API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key,
+    API_ENDPOINTS.ANIME_COLLECTION.GetAnimeCollectionSchedule.key,
+    API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key,
+    API_ENDPOINTS.ANIME_ENTRIES.GetUpcomingEpisodes.key,
+    API_ENDPOINTS.MANGA.GetAnilistMangaCollection.key,
+    API_ENDPOINTS.MANGA.GetRawAnilistMangaCollection.key,
+    API_ENDPOINTS.MANGA.GetMangaCollection.key,
+] as const
+
 async function invalidateQueryKeys(queryClient: ReturnType<typeof useQueryClient>, queryKeys: readonly string[]) {
     await Promise.all(queryKeys.map(queryKey => queryClient.invalidateQueries({ queryKey: [queryKey] })))
 }
@@ -160,34 +180,12 @@ function shouldSyncServerLocalForInvalidation(queryKeys: readonly string[]): boo
     return queryKeys.some(queryKey => serverLocalInvalidationKeys.includes(queryKey))
 }
 
-function parseWebsocketServerEvent(data: unknown): WebsocketServerEvent | null {
-    if (typeof data !== "string") {
-        return null
-    }
-
-    try {
-        const message = JSON.parse(data) as WebsocketServerEvent
-        if (typeof message?.type !== "string") {
-            return null
-        }
-        return message
-    }
-    catch (error) {
-        logger("websocket-event-router").warning("Failed to parse WebSocket message", error)
-        return null
-    }
-}
-
-export function useWebsocketEventRouter(socket: WebSocket | null) {
+export function useWebsocketEventRouter() {
     const queryClient = useQueryClient()
     const activeTorrentCountRef = React.useRef<ActiveTorrentCountPayload | null>(null)
     const downloadCompletionTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
     React.useEffect(() => {
-        if (!socket) {
-            return
-        }
-
         const requestDownloadCompletionSync = () => {
             requestServerLocalSync()
 
@@ -201,12 +199,7 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
             }, DOWNLOAD_COMPLETION_FOLLOW_UP_MS)
         }
 
-        const handleMessage = async (event: WebSocketMessageEvent) => {
-            const message = parseWebsocketServerEvent(event.data)
-            if (!message) {
-                return
-            }
-
+        const handleMessage = async (message: WebsocketMessage) => {
             switch (message.type) {
                 case WEBSOCKET_EVENTS.ErrorToast:
                     if (typeof message.payload === "string") {
@@ -227,6 +220,15 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
                     if (typeof message.payload === "string") {
                         toast.warning(message.payload)
                     }
+                    return
+                case WEBSOCKET_EVENTS.SettingsChanged:
+                    await invalidateQueryKeys(queryClient, settingsChangedKeys)
+                    return
+                case WEBSOCKET_EVENTS.ServerLoggedOutAnilist:
+                    toast.warning(typeof message.payload === "string"
+                        ? message.payload
+                        : "Your AniList session ended. Please log in again.")
+                    await invalidateQueryKeys(queryClient, anilistLogoutKeys)
                     return
                 case WEBSOCKET_EVENTS.RefreshedAnilistAnimeCollection:
                     await invalidateQueryKeys(queryClient, animeCollectionRefreshKeys)
@@ -302,14 +304,14 @@ export function useWebsocketEventRouter(socket: WebSocket | null) {
             }
         }
 
-        socket.addEventListener("message", handleMessage)
+        const unsubscribe = subscribeWsMessage(handleMessage)
 
         return () => {
-            socket.removeEventListener("message", handleMessage)
+            unsubscribe()
             if (downloadCompletionTimerRef.current) {
                 clearTimeout(downloadCompletionTimerRef.current)
                 downloadCompletionTimerRef.current = null
             }
         }
-    }, [queryClient, socket])
+    }, [queryClient])
 }

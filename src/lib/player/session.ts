@@ -1,4 +1,5 @@
 import { getServerBaseUrl } from "@/api/client/server-url"
+import { subscribeWsMessage, type WebsocketMessage } from "@/api/components/websocket-hub"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
 import type {
     AL_AnimeCollection,
@@ -12,7 +13,6 @@ import type {
 } from "@/api/generated/types"
 import { usePlaybackCancelManualTracking } from "@/api/hooks/playback_manager.hooks"
 import { useServerUrl } from "@/atoms/server.atoms"
-import { websocketAtom } from "@/atoms/websocket.atoms"
 import { logger } from "@/lib/utils/logger"
 import { useQueryClient } from "@tanstack/react-query"
 import { useRouter } from "expo-router"
@@ -428,7 +428,6 @@ export function getTorrentStreamLoadingLabel(state: TorrentStreamLoadingState | 
  *
  */
 export function usePlayerEventListener() {
-    const socket = useAtomValue(websocketAtom)
     const serverUrl = useServerUrl()
     const router = useRouter()
     const queryClient = useQueryClient()
@@ -464,7 +463,7 @@ export function usePlayerEventListener() {
     }, [streamSessionMode])
 
     React.useEffect(() => {
-            if (!socket || !serverUrl) return
+            if (!serverUrl) return
 
             const clearLoadingFallback = () => {
                 if (loadingFallbackTimer.current) {
@@ -514,18 +513,7 @@ export function usePlayerEventListener() {
                 setActiveStreamSession(null)
             }
 
-            const handleMessage = (event: WebSocketMessageEvent) => {
-                let parsed: unknown
-                try {
-                    parsed = JSON.parse(event.data as string)
-                }
-                catch (err) {
-                    log.warning("Failed to parse WebSocket message data:", err)
-                    return
-                }
-                const message = parsed as { type?: string; payload?: unknown }
-                if (typeof message?.type !== "string") return
-
+            const handleMessage = (message: WebsocketMessage) => {
                 if (message.type === "torrentstream-state") {
                     const payload = message.payload as TorrentStreamSocketPayload | undefined
                     if (typeof payload?.state !== "string") return
@@ -762,15 +750,15 @@ export function usePlayerEventListener() {
 
             }
 
-            socket.addEventListener("message", handleMessage)
+            const unsubscribe = subscribeWsMessage(handleMessage)
             return () => {
                 clearLoadingFallback()
                 clearCancelManualTrackingTimer()
-                socket.removeEventListener("message", handleMessage)
+                unsubscribe()
             }
         },
         [router, serverUrl, setActiveStreamSession, setDebridStreamState, setError, setIsPreparing, setLoadingMessage, setPendingInfo, setPlayerOpen,
-            setSource, setStreamSessionMode, setTorrentIsLoaded, setTorrentLoadingState, setTorrentLoadingTorrentName, setTorrentStatus, socket])
+            setSource, setStreamSessionMode, setTorrentIsLoaded, setTorrentLoadingState, setTorrentLoadingTorrentName, setTorrentStatus])
 }
 
 /**
@@ -811,14 +799,17 @@ export function useCleanupPlaybackSession() {
     const [, setTorrentStatus] = useAtom(torrentStreamStatusAtom)
     const [, setTorrentIsLoaded] = useAtom(torrentStreamIsLoadedAtom)
     const [, setDebridStreamState] = useAtom(debridStreamStateAtom)
+    const sourceRef = React.useRef(source)
+    sourceRef.current = source
 
     return React.useCallback(() => {
+            const activeSource = sourceRef.current
             setSource(null)
             setPlayerOpen(false)
             setLoadingMessage(null)
             setError(null)
             setPendingInfo(current => {
-                if (current && source && (current.mediaId !== source.mediaId || current.episodeNumber !== source.episodeNumber)) {
+                if (current && activeSource && (current.mediaId !== activeSource.mediaId || current.episodeNumber !== activeSource.episodeNumber)) {
                     return current
                 }
                 return null

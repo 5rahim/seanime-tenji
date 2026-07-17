@@ -13,6 +13,7 @@ import AVKit
 import AVFoundation
 import CoreMedia
 import MPVKit
+import UIKit
 
 struct NowPlayingMetadata {
     let title: String?
@@ -68,6 +69,13 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
         // Audio session
         configureAudioSession()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onPhoneLock),
+            name: UIApplication.protectedDataWillBecomeUnavailableNotification,
+            object: nil
+        )
     }
 
     override func layoutSubviews() {
@@ -86,9 +94,14 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         clearNowPlayingInfo()
         renderer?.stop()
         renderer = nil
+    }
+
+    @objc private func onPhoneLock() {
+        pause()
     }
 
     // MARK: - Audio Session

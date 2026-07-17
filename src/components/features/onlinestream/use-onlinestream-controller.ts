@@ -41,7 +41,7 @@ const selectedProviderAtom = atomWithStorage<string | null>(
     createAtomStorage<string | null>(),
 )
 
-const selectedServerAtom = atomWithStorage<string | null>(
+export const selectedServerAtom = atomWithStorage<string | null>(
     "sea-onlinestream-server",
     null,
     createAtomStorage<string | null>(),
@@ -115,8 +115,8 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
         playRequestedEpisode !== null && !!provider, // only enabled when a play was requested
     )
 
-    const allVideoSources = React.useMemo(
-        () => episodeSource?.videoSources ?? [],
+    const videoSources = React.useMemo(
+        () => dedupeVideoSources(episodeSource?.videoSources ?? []),
         [episodeSource?.videoSources],
     )
 
@@ -160,11 +160,11 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
     // available servers derived from sources
     const availableServers = React.useMemo(() => {
         const servers = new Set<string>()
-        for (const s of allVideoSources) {
+        for (const s of videoSources) {
             if (s.server) servers.add(s.server)
         }
         return Array.from(servers)
-    }, [allVideoSources])
+    }, [videoSources])
 
     // auto-select server when sources arrive
     React.useEffect(() => {
@@ -178,9 +178,9 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
 
     // available qualities derived from server-filtered sources
     const serverFilteredSources = React.useMemo(() => {
-        if (!selectedServer) return dedupeVideoSources(allVideoSources)
-        return dedupeVideoSources(allVideoSources.filter(v => v.server === selectedServer))
-    }, [allVideoSources, selectedServer])
+        if (!selectedServer) return videoSources
+        return videoSources.filter(v => v.server === selectedServer)
+    }, [selectedServer, videoSources])
 
     const availableQualities = React.useMemo(() => {
         const quals = new Set<string>()
@@ -279,7 +279,7 @@ export function useOnlinestreamController({ entry }: UseOnlinestreamControllerPa
         availableQualities,
         episodes,
         episodeListResponse,
-        videoSources: serverFilteredSources,
+        videoSources,
         availableServers,
         selectedVideoSource,
         currentProvider,

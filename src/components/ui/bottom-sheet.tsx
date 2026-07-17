@@ -1,5 +1,10 @@
 import { NAV_THEME } from "@/lib/constants"
-import BottomSheet, { BottomSheetBackdrop, type BottomSheetBackdropProps, BottomSheetScrollView } from "@gorhom/bottom-sheet"
+import BottomSheet, {
+    BottomSheetBackdrop,
+    type BottomSheetBackdropProps,
+    BottomSheetScrollView,
+    type BottomSheetScrollViewMethods,
+} from "@gorhom/bottom-sheet"
 import { Portal } from "@rn-primitives/portal"
 import React, { useCallback, useId, useMemo, useRef } from "react"
 import { Text, View } from "react-native"
@@ -18,6 +23,11 @@ type BottomSheetProps = {
     enableHandlePanningGesture?: boolean
     enablePanDownToClose?: boolean
     enableOverDrag?: boolean
+    keyboardBehavior?: React.ComponentProps<typeof BottomSheet>["keyboardBehavior"]
+    keyboardBlurBehavior?: React.ComponentProps<typeof BottomSheet>["keyboardBlurBehavior"]
+    enableBlurKeyboardOnGesture?: boolean
+    androidKeyboardInputMode?: React.ComponentProps<typeof BottomSheet>["android_keyboardInputMode"]
+    scrollRef?: React.Ref<BottomSheetScrollViewMethods>
 }
 
 export function SeaBottomSheet({
@@ -33,6 +43,11 @@ export function SeaBottomSheet({
     enableHandlePanningGesture = true,
     enablePanDownToClose = true,
     enableOverDrag = true,
+    keyboardBehavior,
+    keyboardBlurBehavior,
+    enableBlurKeyboardOnGesture,
+    androidKeyboardInputMode,
+    scrollRef,
 }: BottomSheetProps) {
     const id = useId()
     const bottomSheetRef = useRef<BottomSheet>(null)
@@ -78,6 +93,10 @@ export function SeaBottomSheet({
                         enableHandlePanningGesture={enableHandlePanningGesture}
                         enablePanDownToClose={enablePanDownToClose}
                         enableOverDrag={enableOverDrag}
+                        keyboardBehavior={keyboardBehavior}
+                        keyboardBlurBehavior={keyboardBlurBehavior}
+                        enableBlurKeyboardOnGesture={enableBlurKeyboardOnGesture}
+                        android_keyboardInputMode={androidKeyboardInputMode}
                         backdropComponent={renderBackdrop}
                         handleIndicatorStyle={{ backgroundColor: "#666" }}
                         backgroundStyle={{ backgroundColor: NAV_THEME.dark.card }}
@@ -86,6 +105,7 @@ export function SeaBottomSheet({
                         topInset={insets.top}
                     >
                         <BottomSheetScrollView
+                            ref={scrollRef}
                             style={{ flex: 1 }}
                             contentContainerStyle={{ paddingHorizontal: 16, paddingTop: topPadding, paddingBottom: bottomPadding }}
                             keyboardShouldPersistTaps="handled"

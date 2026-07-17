@@ -2,18 +2,21 @@ import { TabBarIcon } from "@/components/navigation/tab-bar-icon"
 import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import * as React from "react"
-import { Platform, Pressable, View } from "react-native"
+import { Platform, Pressable, useWindowDimensions, View } from "react-native"
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 export type AnimeEntryView = "library" | "torrentstream" | "onlinestream" | "info" | "downloaded" | "server-local"
 
 type AnimeEntryViewSwitcherProps = {
     currentView: AnimeEntryView
     onViewChange: (view: AnimeEntryView) => void
-    bottomInset: number
     isOffline?: boolean
     hiddenViews?: Set<AnimeEntryView>
 }
+
+const BAR_GAP = 16
+const BAR_LIMIT = 560
 
 const VIEW_ITEMS: Array<{ label: string, icon: React.ComponentProps<typeof Ionicons>["name"], view: AnimeEntryView }> = [
     { label: "Library", icon: "library-outline", view: "library" },
@@ -26,7 +29,12 @@ const VIEW_ITEMS: Array<{ label: string, icon: React.ComponentProps<typeof Ionic
 
 const OFFLINE_DISABLED_VIEWS: Set<AnimeEntryView> = new Set(["library", "torrentstream", "onlinestream"])
 
-export function AnimeEntryViewSwitcher({ currentView, onViewChange, bottomInset, isOffline, hiddenViews }: AnimeEntryViewSwitcherProps) {
+export function AnimeEntryViewSwitcher({ currentView, onViewChange, isOffline, hiddenViews }: AnimeEntryViewSwitcherProps) {
+    const insets = useSafeAreaInsets()
+    const { width: screenWidth } = useWindowDimensions()
+    const usableWidth = Math.max(0, screenWidth - insets.left - insets.right)
+    const barWidth = Math.min(BAR_LIMIT, Math.max(0, usableWidth - BAR_GAP * 2))
+    const barLeft = insets.left + (usableWidth - barWidth) / 2
     const visibleItems = React.useMemo(() => {
         let items = VIEW_ITEMS
         if (hiddenViews?.size) {
@@ -41,9 +49,11 @@ export function AnimeEntryViewSwitcher({ currentView, onViewChange, bottomInset,
     return (
         <View
             pointerEvents="box-none"
-            className="absolute left-4 right-4"
+            className="absolute"
             style={{
-                bottom: Math.max(bottomInset, Platform.OS === "ios" ? 20 : 10),
+                bottom: Math.max(insets.bottom, Platform.OS === "ios" ? 20 : 10),
+                left: barLeft,
+                width: barWidth,
             }}
         >
             <View

@@ -13,6 +13,7 @@ import {
     AL_FuzzyDateInput,
     AL_ListAnime,
     AL_ListRecentAnime,
+    AL_MediaTagMap,
     AL_Stats,
     AL_StudioDetails,
     Anime_Entry,
@@ -108,6 +109,15 @@ export function useGetRawAnimeCollection() {
     })
 }
 
+export function useGetRawAnimeCollectionTags(enabled: boolean = true) {
+    return useServerQuery<AL_MediaTagMap>({
+        endpoint: API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.endpoint,
+        method: API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.methods[0],
+        queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.key],
+        enabled,
+    })
+}
+
 export function useRefreshAnimeCollection() {
     const queryClient = useQueryClient()
 
@@ -120,6 +130,8 @@ export function useRefreshAnimeCollection() {
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key] })
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetAnimeCollection.key] })
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollection.key] })
+            await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.key] })
+            await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.key] })
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANIME_ENTRIES.GetMissingEpisodes.key] })
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetMangaCollection.key] })
             await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANIME_ENTRIES.GetAnimeEntry.key] })
@@ -144,9 +156,12 @@ export function useEditAnilistListEntry(id: Nullish<string | number>, type: "ani
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetAnimeCollection.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.key] })
             } else if (type === "manga") {
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetMangaEntry.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetAnilistMangaCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetMangaCollection.key] })
             }
         },
@@ -223,9 +238,12 @@ export function useDeleteAnilistListEntry(id: Nullish<string | number>,
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANIME_COLLECTION.GetLibraryCollection.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetAnimeCollection.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.ANILIST.GetRawAnimeCollectionTags.key] })
             } else if (type === "manga") {
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetMangaEntry.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetAnilistMangaCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollection.key] })
+                await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetRawAnilistMangaCollectionTags.key] })
                 await queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.MANGA.GetMangaCollection.key] })
             }
             onSuccess()

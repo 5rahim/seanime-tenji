@@ -1,10 +1,14 @@
 import { AL_MediaFormat, AL_MediaSeason, AL_MediaSort, AL_MediaStatus } from "@/api/generated/types"
 import { atom } from "jotai"
+import mediaTags from "./media-tags.json"
+import { getAnimeMinScore, getMangaMinScore } from "./search-values"
+import { type MediaTag, removeAdultTags } from "./tag-filter"
 
 export type SearchParams = {
     title: string | null
     sorting: AL_MediaSort
     genre: string[]
+    tags: string[]
     status: AL_MediaStatus[]
     format: AL_MediaFormat | null
     season: AL_MediaSeason | null
@@ -19,6 +23,7 @@ export const DEFAULT_SEARCH_PARAMS: SearchParams = {
     title: null,
     sorting: "SCORE_DESC",
     genre: [],
+    tags: [],
     status: [],
     format: null,
     season: null,
@@ -38,15 +43,17 @@ export function isSearchActive(params: SearchParams): boolean {
 
 export function getAnimeSearchVariables(params: SearchParams, page: number) {
     const hasTitle = !!params.title?.trim()
+    const tags = params.isAdult ? params.tags : removeAdultTags(params.tags, mediaTags as MediaTag[])
     return {
         page,
         perPage: 30,
         format: params.format ?? undefined,
         search: hasTitle ? params.title ?? undefined : undefined,
         genres: params.genre.length > 0 ? params.genre : undefined,
+        tags: tags.length > 0 ? tags : undefined,
         season: params.season ?? undefined,
         seasonYear: params.year ? parseInt(params.year, 10) : undefined,
-        averageScore_greater: params.minScore ? parseInt(params.minScore, 10) : undefined,
+        averageScore_greater: getAnimeMinScore(params.minScore),
         sort: hasTitle
             ? (["SEARCH_MATCH", params.sorting] as AL_MediaSort[])
             : ([params.sorting] as AL_MediaSort[]),
@@ -64,14 +71,16 @@ export function getAnimeSearchVariables(params: SearchParams, page: number) {
 
 export function getMangaSearchVariables(params: SearchParams, page: number) {
     const hasTitle = !!params.title?.trim()
+    const tags = params.isAdult ? params.tags : removeAdultTags(params.tags, mediaTags as MediaTag[])
     return {
         page,
         perPage: 30,
         search: hasTitle ? params.title ?? undefined : undefined,
         genres: params.genre.length > 0 ? params.genre : undefined,
+        tags: tags.length > 0 ? tags : undefined,
         year: params.year ? parseInt(params.year, 10) : undefined,
         format: params.format ?? undefined,
-        averageScore_greater: params.minScore ? parseInt(params.minScore, 10) : undefined,
+        averageScore_greater: getMangaMinScore(params.minScore),
         sort: hasTitle
             ? (["SEARCH_MATCH", params.sorting] as AL_MediaSort[])
             : ([params.sorting] as AL_MediaSort[]),
@@ -92,6 +101,7 @@ export function getActiveFiltersCount(params: SearchParams): number {
     let count = 0
     if (params.sorting !== "SCORE_DESC") count++
     if (params.genre.length > 0) count++
+    if (params.tags.length > 0) count++
     if (params.status.length > 0) count++
     if (params.format !== null) count++
     if (params.season !== null && params.type === "anime") count++

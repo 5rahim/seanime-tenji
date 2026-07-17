@@ -7,6 +7,7 @@ import type {
     MKVParser_Metadata,
     NativePlayer_StreamType,
     Onlinestream_Subtitle,
+    Onlinestream_VideoSource,
 } from "@/api/generated/types"
 import type { ServerLocalIdentity } from "@/lib/offline/server-local-store"
 
@@ -100,6 +101,12 @@ export type MobilePlaybackSource = {
 
     /** External subtitle tracks for online streaming. */
     externalSubtitles?: Onlinestream_Subtitle[]
+
+    /** Sources returned for the current online-stream episode. */
+    onlineSources?: Onlinestream_VideoSource[]
+
+    /** Online-stream source currently loaded by the player. */
+    onlineSource?: Onlinestream_VideoSource
 
     episodes?: Anime_Episode[]
 }

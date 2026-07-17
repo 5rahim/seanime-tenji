@@ -24,6 +24,20 @@ export function useContinuitySync(
     const { mutate: cancelManualTracking } = usePlaybackCancelManualTracking({})
 
     const hasSyncedCompletion = React.useRef(false)
+    const latestRef = React.useRef({
+        isConnected,
+        source,
+        currentTime: playerState.currentTime,
+        duration: playerState.duration,
+        updateContinuity,
+    })
+    latestRef.current = {
+        isConnected,
+        source,
+        currentTime: playerState.currentTime,
+        duration: playerState.duration,
+        updateContinuity,
+    }
 
     React.useEffect(() => {
         if (!isConnected || !source || source.serverStreamType || source.mediaId <= 0 || source.episodeNumber <= 0) return
@@ -39,28 +53,22 @@ export function useContinuitySync(
         }
     }, [cancelManualTracking, isConnected, source?.episodeNumber, source?.id, source?.mediaId, source?.serverStreamType, startManualTracking])
 
-    const getPayload = React.useCallback(() => {
-        if (!source) return null
-        return {
-            options: {
-                currentTime: playerState.currentTime,
-                duration: playerState.duration,
-                mediaId: source.mediaId,
-                episodeNumber: source.episodeNumber,
-                filepath: source.localFile?.path,
-                kind: source.continuityKind,
-            },
-        }
-    }, [source, playerState.currentTime, playerState.duration])
-
-    // Flush continuity to server
     const flushContinuity = React.useCallback(() => {
-        if (!isConnected) return
+        const latest = latestRef.current
+        if (!latest.isConnected || !latest.source || latest.duration <= 0) return
 
-        const payload = getPayload()
-        if (!payload || playerState.duration <= 0) return
-        updateContinuity(payload)
-    }, [getPayload, isConnected, playerState.duration, updateContinuity])
+        const activeSource = latest.source
+        latest.updateContinuity({
+            options: {
+                currentTime: latest.currentTime,
+                duration: latest.duration,
+                mediaId: activeSource.mediaId,
+                episodeNumber: activeSource.episodeNumber,
+                filepath: activeSource.localFile?.path,
+                kind: activeSource.continuityKind,
+            },
+        })
+    }, [])
 
     // Periodic continuity updates while playing
     React.useEffect(() => {
@@ -71,7 +79,7 @@ export function useContinuitySync(
         }, CONTINUITY_UPDATE_INTERVAL_MS)
 
         return () => clearInterval(interval)
-    }, [source, playerState.paused, playerState.duration, flushContinuity])
+    }, [source?.id, playerState.paused, playerState.duration, flushContinuity])
 
     // Flush on pause
     React.useEffect(() => {
@@ -97,7 +105,7 @@ export function useContinuitySync(
         return () => {
             flushContinuity()
         }
-    }, [])
+    }, [flushContinuity])
 
     // Detect completion
     React.useEffect(() => {

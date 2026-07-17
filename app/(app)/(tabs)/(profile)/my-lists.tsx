@@ -6,9 +6,10 @@ import {
     AL_MangaCollection_MediaListCollection_Lists,
     AL_MangaCollection_MediaListCollection_Lists_Entries,
     AL_MediaListStatus,
+    AL_MediaTagMap,
 } from "@/api/generated/types"
-import { useGetRawAnimeCollection } from "@/api/hooks/anilist.hooks"
-import { useGetRawAnilistMangaCollection } from "@/api/hooks/manga.hooks"
+import { useGetRawAnimeCollection, useGetRawAnimeCollectionTags } from "@/api/hooks/anilist.hooks"
+import { useGetRawAnilistMangaCollection, useGetRawAnilistMangaCollectionTags } from "@/api/hooks/manga.hooks"
 import { useServerStatus } from "@/atoms/server.atoms"
 import { FilterButton } from "@/components/features/discover/search-filter-sheet"
 import { MediaEntryCard } from "@/components/features/media/media-entry-card"
@@ -134,6 +135,7 @@ function buildSections(
     showAdult: boolean | undefined,
     type: "anime" | "manga",
     numColumns: number,
+    mediaTagMap: AL_MediaTagMap | undefined,
 ): SectionData[] {
     if (!lists) return []
 
@@ -144,7 +146,7 @@ function buildSections(
         entries: (AL_AnimeCollection_MediaListCollection_Lists_Entries | AL_MangaCollection_MediaListCollection_Lists_Entries)[] | undefined,
     ) {
         if (!entries?.length) return
-        let filtered = filterListEntries(entries, params, showAdult)
+        let filtered = filterListEntries(entries, params, showAdult, mediaTagMap)
         if (titleQuery.trim()) {
             filtered = filterEntriesByTitle(filtered, titleQuery) as typeof filtered
         }
@@ -293,10 +295,13 @@ export default function MyListsScreen() {
 
     const { data: animeCollection, isLoading: animeLoading } = useGetRawAnimeCollection()
     const { data: mangaCollection, isLoading: mangaLoading } = useGetRawAnilistMangaCollection()
+    const { data: animeTagMap } = useGetRawAnimeCollectionTags(isConnected)
+    const { data: mangaTagMap } = useGetRawAnilistMangaCollectionTags(isConnected && enableManga)
 
     const lists = type === "anime"
         ? animeCollection?.MediaListCollection?.lists
         : mangaCollection?.MediaListCollection?.lists
+    const mediaTagMap = type === "anime" ? animeTagMap : mangaTagMap
 
     const isLoading = type === "anime" ? animeLoading : mangaLoading
 
@@ -335,8 +340,10 @@ export default function MyListsScreen() {
     }, [type])
 
     // build sections
-    const sections = React.useMemo(() => buildSections(lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns),
-        [lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns])
+    const sections = React.useMemo(
+        () => buildSections(lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns, mediaTagMap),
+        [lists, selectedList, titleQuery, filterParams, showAdult, type, numColumns, mediaTagMap],
+    )
 
     const hasFilters = activeFilterCount > 0 || !!titleQuery.trim()
 

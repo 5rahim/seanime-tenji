@@ -77,3 +77,8 @@ export const CURRENT_YEAR = new Date().getFullYear()
 export const SEARCH_YEARS = Array.from({ length: CURRENT_YEAR - 1990 + 2 }, (_, i) =>
     String(CURRENT_YEAR + 1 - i),
 )
+
+export const SEARCH_MIN_SCORES = Array.from({ length: 9 }, (_, index) => ({
+    value: String(index + 1),
+    label: `${index + 1}+`,
+}))

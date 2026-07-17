@@ -87,21 +87,21 @@ function AnimeEntryCardProgressBadge({
     libraryData,
     nakamaLibraryData,
     cardWidth,
+    showUnwatched,
 }: {
     media: AL_BaseAnime
     listData?: Anime_EntryListData
     libraryData?: Anime_EntryLibraryData
     nakamaLibraryData?: Anime_NakamaEntryLibraryData
     cardWidth: number
+    showUnwatched: boolean
 }) {
-    const serverStatus = useServerStatus()
-
     const progress = listData?.progress ?? 0
     const isInLibrary = !!nakamaLibraryData?.mainFileCount || !!libraryData?.mainFileCount
     const unwatchedFromLibrary = nakamaLibraryData?.unwatchedCount ?? libraryData?.unwatchedCount ?? 0
     const unwatchedFromStreaming = Math.max(0, getCurrentAnimeEpisodeCount(media) - progress)
     const unwatchedCount = isInLibrary ? unwatchedFromLibrary : unwatchedFromStreaming
-    const shouldShowUnwatchedCount = (serverStatus?.themeSettings?.showAnimeUnwatchedCount ?? true)
+    const shouldShowUnwatchedCount = showUnwatched
         && (listData?.status === "CURRENT" || listData?.status === "REPEATING")
         && unwatchedCount > 0
 
@@ -216,6 +216,9 @@ export function MediaEntryCard<T extends "anime" | "manga">(props: MediaEntryCar
     } = props
 
     const serverStatus = useServerStatus()
+    const hideScore = !!serverStatus?.settings?.anilist?.hideAudienceScore
+    const blurAdult = !!serverStatus?.settings?.anilist?.blurAdultContent
+    const showUnwatched = serverStatus?.themeSettings?.showAnimeUnwatchedCount ?? true
     const [sheetOpen, setSheetOpen] = React.useState(false)
     const syncedListData = useMediaEntryListDataValue(type, media.id)
     const syncedLibraryEntryData = useAnimeLibraryEntryDataValue(media.id)
@@ -245,8 +248,8 @@ export function MediaEntryCard<T extends "anime" | "manga">(props: MediaEntryCar
         setSheetOpen(true)
     }
 
-    const showAudienceScore = serverStatus?.settings?.anilist?.hideAudienceScore ? false : _showAudienceScore
-    const blurAdultContent = !!serverStatus?.settings?.anilist?.blurAdultContent && !!media.isAdult
+    const showAudienceScore = hideScore ? false : _showAudienceScore
+    const blurAdultContent = blurAdult && !!media.isAdult
     const posterHeight = cardWidth * (cardWidth < 150 ? 1.305 : 1.275)
     const showAnimeLibraryBadge = type === "anime" && !!libraryData && !hideLibraryBadge
     const animeLibraryFileCount = showAnimeLibraryBadge ? libraryData?.mainFileCount : undefined
@@ -287,6 +290,7 @@ export function MediaEntryCard<T extends "anime" | "manga">(props: MediaEntryCar
                                 libraryData={libraryData as Anime_EntryLibraryData | undefined}
                                 nakamaLibraryData={nakamaLibraryData as Anime_NakamaEntryLibraryData | undefined}
                                 cardWidth={cardWidth}
+                                showUnwatched={showUnwatched}
                             />
                         ) : (
                             <MangaEntryCardProgressBadge

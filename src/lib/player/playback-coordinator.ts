@@ -173,6 +173,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
     // Online stream playback
     const playOnlineStreamEpisode = (params: {
         videoSource: Onlinestream_VideoSource
+        videoSources: Onlinestream_VideoSource[]
         episodeNumber: number
         episode?: Anime_Episode
     }) => {
@@ -184,6 +185,7 @@ export function usePlaybackCoordinator(entry: Anime_Entry | undefined) {
 
         const source = toSourceFromOnlineStream({
             videoSource: params.videoSource,
+            videoSources: params.videoSources,
             mediaId: entry.media.id,
             episodeNumber: params.episodeNumber,
             media: entry.media,

@@ -13,7 +13,7 @@ const CLIENT_PLATFORM_QUERY_PARAM = "platform"
 
 export const SERVER_CLIENT_PLATFORM = "mobile"
 
-type ClientIdentity = {
+export type ClientIdentity = {
     clientId: string
     clientIdProof: string
 }
@@ -138,15 +138,17 @@ export function saveClientIdentityFromHeaders(headers: unknown) {
     }
 }
 
-export function saveClientIdentityFromEvent(payload: unknown) {
+export function saveClientIdentityFromEvent(payload: unknown): ClientIdentity | null {
     if (typeof payload !== "object" || payload === null) {
-        return
+        return null
     }
 
     const clientId = normalizeValue("clientId" in payload && typeof payload.clientId === "string" ? payload.clientId : "")
     const clientIdProof = normalizeValue("proof" in payload && typeof payload.proof === "string" ? payload.proof : "")
 
     if (clientId) {
-        saveClientIdentity(clientId, clientIdProof)
+        return saveClientIdentity(clientId, clientIdProof)
     }
+
+    return null
 }

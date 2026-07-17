@@ -230,11 +230,11 @@ export function useUpdateAnimeEntryRepeat(id: Nullish<string | number>) {
     })
 }
 
-export function useGetUpcomingEpisodes() {
+export function useGetUpcomingEpisodes(enabled: boolean = true) {
     return useServerQuery<Anime_UpcomingEpisodes>({
         endpoint: API_ENDPOINTS.ANIME_ENTRIES.GetUpcomingEpisodes.endpoint,
         method: API_ENDPOINTS.ANIME_ENTRIES.GetUpcomingEpisodes.methods[0],
         queryKey: [API_ENDPOINTS.ANIME_ENTRIES.GetUpcomingEpisodes.key],
-        enabled: true,
+        enabled,
     })
 }

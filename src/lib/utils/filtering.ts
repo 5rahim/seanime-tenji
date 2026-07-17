@@ -12,6 +12,7 @@ import {
     Manga_CollectionEntry,
 } from "@/api/generated/types"
 import { getMangaEntryLatestChapterNumber, MangaEntryFilters } from "@/hooks/use-manga-chapters"
+import { hasMediaTags } from "@/lib/search/tag-filter"
 import type { AnimeCollectionSorting, ContinueWatchingSorting, MangaCollectionSorting } from "@/lib/theme-settings"
 import sortBy from "lodash/sortBy"
 
@@ -90,6 +91,7 @@ export const MANGA_COLLECTION_SORTING_OPTIONS: { label: string; value: MangaColl
 export type CollectionParams = {
     sorting: CollectionSorting
     genre: string[] | null
+    tags: string[] | null
     status: AL_MediaStatus | null
     format: AL_MediaFormat | null
     season: AL_MediaSeason | null
@@ -100,6 +102,7 @@ export type CollectionParams = {
 export const DEFAULT_COLLECTION_PARAMS: CollectionParams = {
     sorting: "SCORE_DESC",
     genre: null,
+    tags: null,
     status: null,
     format: null,
     season: null,
@@ -171,6 +174,7 @@ export function filterListEntries<T extends AL_MangaCollection_MediaListCollecti
     entries: T | null | undefined,
     params: CollectionParams,
     showAdultContent: boolean | undefined,
+    mediaTagMap?: Record<number, Array<string>> | null,
 ) {
     if (!entries) return []
     let arr = [...entries]
@@ -198,6 +202,11 @@ export function filterListEntries<T extends AL_MangaCollection_MediaListCollecti
         arr = arr.filter(n => {
             return params.genre?.every(genre => n.media?.genres?.includes(genre))
         })
+    }
+
+    // Filter by AniList tags
+    if (!!arr && !!params.tags?.length && !!mediaTagMap) {
+        arr = arr.filter(n => hasMediaTags(n.media?.id, params.tags ?? [], mediaTagMap))
     }
 
     // Initial sort by name

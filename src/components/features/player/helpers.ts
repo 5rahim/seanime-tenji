@@ -80,6 +80,7 @@ export function getBackPanel(panel: PlayerPanel): PlayerPanel | null {
         case "speed":
         case "seek-buttons":
         case "double-tap-seek":
+        case "video-sources":
         case "video-output":
             return "main"
         case "audio-tracks":

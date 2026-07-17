@@ -1,4 +1,4 @@
-import type { Anime_Episode } from "@/api/generated/types"
+import type { Anime_Episode, Onlinestream_VideoSource } from "@/api/generated/types"
 import { Button } from "@/components/ui/button"
 import type { PlayerState as PlayerStateType, PlayerTrack } from "@/lib/player"
 import type { PlayerPreferences } from "@/lib/player/player-preferences"
@@ -19,6 +19,7 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    Clapperboard,
     Cpu,
     Download,
     Gauge,
@@ -60,6 +61,7 @@ const PANEL_META: Record<PlayerPanel, { title: string; icon?: React.ReactNode }>
     speed: { title: "Playback Speed", icon: <Gauge size={15} color={BRAND_ACCENT} /> },
     "seek-buttons": { title: "Forward / Back Seek", icon: <SkipForward size={15} color={BRAND_ACCENT} /> },
     "double-tap-seek": { title: "Double-Tap Seek", icon: <RotateCw size={15} color={BRAND_ACCENT} /> },
+    "video-sources": { title: "Video Source", icon: <Clapperboard size={15} color={BRAND_ACCENT} /> },
     "video-output": { title: "Video Renderer", icon: <Cpu size={15} color={BRAND_ACCENT} /> },
     "subtitle-delay": { title: "Subtitle Delay", icon: <Timer size={15} color="#f59e0b" /> },
     "audio-delay": { title: "Audio Delay", icon: <Timer size={15} color="#a78bfa" /> },
@@ -102,6 +104,9 @@ export interface PlayerPanelOverlayProps {
     episodes?: Anime_Episode[]
     currentEpisodeNumber?: number
     onPlayEpisode?: (episode: Anime_Episode) => void
+    videoSources?: Onlinestream_VideoSource[]
+    videoSource?: Onlinestream_VideoSource
+    onSetVideoSource?: (source: Onlinestream_VideoSource) => void
     prefs: PlayerPreferences
     updatePrefs: (p: Partial<PlayerPreferences>) => void
     onSetSpeed: (s: number) => void
@@ -186,6 +191,8 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
                             onToggleSideSwipeControls={props.onToggleSideSwipeControls}
                             onToggleAutoSkipOpEd={props.onToggleAutoSkipOpEd}
                             onLockScreen={props.onLockScreen}
+                            videoSources={props.videoSources}
+                            videoSource={props.videoSource}
                         />
                     )}
                     {panel === "episodes" && (
@@ -226,6 +233,16 @@ export function PlayerPanelOverlay(props: PlayerPanelOverlayProps) {
                             }}
                         />
                     )}
+                    {/*{panel === "video-sources" && (
+                     <VideoSourcesContent
+                     sources={props.videoSources ?? []}
+                     current={props.videoSource}
+                     onSelect={(source) => {
+                     props.onSetVideoSource?.(source)
+                     onClose()
+                     }}
+                     />
+                     )}*/}
                     {panel === "video-output" && (
                         <VideoOutputContent
                             current={prefs.androidVideoOutput}
@@ -352,12 +369,15 @@ function PanelSelectableRow({
 function MainSettingsContent({
     state, prefs, onNavigate, onStartPiP, onToggleAutoNext,
     onToggleCenterTapPlayPause, onToggleSideSwipeControls, onToggleAutoSkipOpEd, onLockScreen,
+    videoSources = [], videoSource,
 }: {
     state: PlayerStateType; prefs: PlayerPreferences; onNavigate: (p: PlayerPanel) => void
     onStartPiP?: () => void; onToggleAutoNext?: () => void
     onToggleCenterTapPlayPause?: () => void; onToggleSideSwipeControls?: () => void
     onToggleAutoSkipOpEd?: () => void
     onLockScreen?: () => void
+    videoSources?: Onlinestream_VideoSource[]
+    videoSource?: Onlinestream_VideoSource
 }) {
     const rows: Array<{
         label: string; value: string; panel: PlayerPanel; icon: React.ReactNode
@@ -431,6 +451,15 @@ function MainSettingsContent({
         },
     ]
 
+    if (videoSources.length > 1 && videoSource) {
+        rows.unshift({
+            label: "Video Source",
+            value: [videoSource.server, videoSource.quality].filter(Boolean).join(" · "),
+            panel: "video-sources",
+            icon: <Clapperboard size={15} color="rgba(255,255,255,0.6)" />,
+        })
+    }
+
     if (Platform.OS === "android") {
         rows.push({
             label: "Video Renderer",
@@ -451,6 +480,53 @@ function MainSettingsContent({
                 onToggleAutoSkipOpEd={onToggleAutoSkipOpEd}
                 onLockScreen={onLockScreen}
             />
+        </View>
+    )
+}
+
+function VideoSourcesContent({ sources, current, onSelect }: {
+    sources: Onlinestream_VideoSource[]
+    current?: Onlinestream_VideoSource
+    onSelect: (source: Onlinestream_VideoSource) => void
+}) {
+    return (
+        <View className="gap-3">
+            <Text className="px-0.5 text-xs leading-5 text-white/45">
+                Switching source keeps your current playback position.
+            </Text>
+            <View className={PANEL_CARD_CLASS}>
+                {sources.map((source, index) => {
+                    const active = source.url === current?.url
+                    const detail = [source.label, source.quality]
+                        .filter((value, valueIndex, values) => value && values.indexOf(value) === valueIndex)
+                        .join(" · ")
+
+                    return (
+                        <PanelSelectableRow
+                            key={`${source.url}-${source.server}-${source.quality}`}
+                            active={active}
+                            borderTop={index > 0}
+                            onPress={() => onSelect(source)}
+                            className="justify-between"
+                        >
+                            <View className="mr-2 flex-1 gap-0.5">
+                                <Text
+                                    className={cn("text-sm text-white", active && "font-semibold text-player-text")}
+                                    numberOfLines={1}
+                                >
+                                    {source.server || `Source ${index + 1}`}
+                                </Text>
+                                {!!detail && (
+                                    <Text className="text-xs text-white/35" numberOfLines={1}>
+                                        {detail}
+                                    </Text>
+                                )}
+                            </View>
+                            {active && <Check size={14} color={BRAND_ACCENT} />}
+                        </PanelSelectableRow>
+                    )
+                })}
+            </View>
         </View>
     )
 }

@@ -1,6 +1,7 @@
-import { AL_MediaSeason } from "@/api/generated/types"
-import { useAnilistListAnime, useAnilistListMissedSequels } from "@/api/hooks/anilist.hooks"
+import { AL_BaseAnime, AL_ListRecentAnime_Page_AiringSchedules, AL_MediaSeason } from "@/api/generated/types"
+import { useAnilistListAnime, useAnilistListMissedSequels, useAnilistListRecentAiringAnime } from "@/api/hooks/anilist.hooks"
 import { useAnilistListManga } from "@/api/hooks/manga.hooks"
+import React from "react"
 
 /**
  * Returns the current AniList season and year based on the current month.
@@ -41,6 +42,39 @@ export function useDiscoverTrendingAnime(enabled: boolean = true, genres?: strin
         sort: ["TRENDING_DESC"],
         genres: genres && genres.length > 0 ? genres : undefined,
     }, enabled)
+}
+
+export function getRecentAnime(schedules: AL_ListRecentAnime_Page_AiringSchedules[] | undefined): AL_BaseAnime[] {
+    if (!schedules) return []
+
+    const seen = new Set<number>()
+    const media: AL_BaseAnime[] = []
+
+    for (const item of [...schedules].sort((a, b) => b.airingAt - a.airingAt)) {
+        const anime = item.media
+        if (!anime || seen.has(anime.id) || anime.isAdult || anime.format === "TV_SHORT") continue
+        seen.add(anime.id)
+        media.push(anime)
+    }
+
+    return media
+}
+
+
+export function useDiscoverRecentlyAired(enabled: boolean = true) {
+    const [now] = React.useState(() => Math.floor(Date.now() / 1000))
+    const query = useAnilistListRecentAiringAnime({
+        page: 1,
+        perPage: 50,
+        airingAt_greater: now - (14 * 24 * 60 * 60),
+        airingAt_lesser: now,
+        notYetAired: false,
+        sort: ["TIME_DESC"],
+    }, enabled)
+    const media = React.useMemo(() => getRecentAnime(query.data?.Page?.airingSchedules),
+        [query.data?.Page?.airingSchedules])
+
+    return { ...query, media }
 }
 
 export function useDiscoverCurrentSeasonAnime(enabled: boolean = true) {

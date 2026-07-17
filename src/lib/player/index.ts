@@ -9,6 +9,7 @@ export type {
 } from "./types"
 
 export {
+    switchOnlineSource,
     toSourceFromOnlineStream,
 } from "./source-resolver"
 

@@ -1,5 +1,6 @@
 import {
     Anime_Episode,
+    Debrid_TorrentItemInstantAvailability,
     DebridClient_FilePreview,
     ExtensionRepo_AnimeTorrentProviderExtensionItem,
     Habari_Metadata,
@@ -23,6 +24,7 @@ import * as React from "react"
 import { ActivityIndicator, Pressable, Text, View } from "react-native"
 import { NONE_PROVIDER, TORRENT_RESOLUTIONS, TorrentResolution, TorrentSearchMode, TorrentSheetStage } from "./use-torrent-stream-controller"
 import type { StreamMode } from "./use-torrent-stream-controller"
+
 
 type TorrentStreamPickerSheetProps = {
     batchHistory?: Torrentstream_BatchHistoryResponse
@@ -64,6 +66,7 @@ type TorrentStreamPickerSheetProps = {
     smartSearchFilters: HibikeTorrent_AnimeProviderSmartSearchFilter[]
     supportsSmartSearch: boolean
     torrents: HibikeTorrent_AnimeTorrent[]
+    torrentCache?: Record<string, Debrid_TorrentItemInstantAvailability>
     torrentMetadataByInfoHash?: Record<string, Habari_Metadata | undefined>
     usePreviousBatch: boolean
     resolution: TorrentResolution
@@ -125,6 +128,7 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         smartSearchFilters,
         supportsSmartSearch,
         torrents,
+        torrentCache,
         torrentMetadataByInfoHash,
         usePreviousBatch,
         resolution,
@@ -346,6 +350,7 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                         smartSearchFilters={smartSearchFilters}
                         supportsSmartSearch={supportsSmartSearch}
                         torrents={torrents}
+                        torrentCache={torrentCache}
                         torrentMetadataByInfoHash={torrentMetadataByInfoHash}
                         usePreviousBatch={usePreviousBatch}
                         searchAcrossProviders={searchAcrossProviders}
@@ -383,6 +388,25 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
     )
 }
 
+/**
+ *
+ */
+
+export function _cleanTorrentHash(hash?: string | null): string {
+    if (!hash) return ""
+    return hash.trim().toLowerCase()
+}
+
+export function makeCacheSet(cache?: Record<string, unknown>): Set<string> {
+    const hashes = Object.keys(cache ?? {}).map(_cleanTorrentHash).filter(Boolean)
+    return new Set(hashes)
+}
+
+export function isTorrentCached(hash: string | null | undefined, cache: ReadonlySet<string>): boolean {
+    const cleanHash = _cleanTorrentHash(hash)
+    return cleanHash.length > 0 && cache.has(cleanHash)
+}
+
 type TorrentSelectionStageProps = {
     batchHistory?: Torrentstream_BatchHistoryResponse
     batchHistoryMetadata?: Habari_Metadata
@@ -411,6 +435,7 @@ type TorrentSelectionStageProps = {
     smartSearchFilters: HibikeTorrent_AnimeProviderSmartSearchFilter[]
     supportsSmartSearch: boolean
     torrents: HibikeTorrent_AnimeTorrent[]
+    torrentCache?: Record<string, Debrid_TorrentItemInstantAvailability>
     torrentMetadataByInfoHash?: Record<string, Habari_Metadata | undefined>
     usePreviousBatch: boolean
     searchAcrossProviders: boolean
@@ -456,6 +481,7 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
         smartSearchFilters,
         supportsSmartSearch,
         torrents,
+        torrentCache,
         torrentMetadataByInfoHash,
         usePreviousBatch,
         searchAcrossProviders,
@@ -489,6 +515,8 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
         [providerOptions],
     )
 
+    const cacheSet = React.useMemo(() => makeCacheSet(torrentCache), [torrentCache])
+
     const releaseCards = React.useMemo(() => {
         return torrents.map((torrent, index) => {
             const isSelected = selectedTorrent?.infoHash === torrent.infoHash && selectedTorrent?.downloadUrl === torrent.downloadUrl
@@ -503,11 +531,12 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
                         episodes={episodes}
                         metadata={torrent.infoHash ? torrentMetadataByInfoHash?.[torrent.infoHash] : undefined}
                         isSelected={isSelected}
+                        isCached={isTorrentCached(torrent.infoHash, cacheSet)}
                     />
                 </Pressable>
             )
         })
-    }, [episodes, onSelectTorrent, selectedTorrent?.downloadUrl, selectedTorrent?.infoHash, torrentMetadataByInfoHash, torrents])
+    }, [cacheSet, episodes, onSelectTorrent, selectedTorrent?.downloadUrl, selectedTorrent?.infoHash, torrents, torrentMetadataByInfoHash])
 
     const segmentedOptions = React.useMemo(() => [
         { value: "torrent", label: "Torrent Client" },
@@ -723,6 +752,7 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
                             episodes={episodes}
                             metadata={batchHistoryMetadata}
                             isSelected={selectedTorrent?.infoHash === batchHistory.torrent?.infoHash}
+                            isCached={isTorrentCached(batchHistory.torrent.infoHash, cacheSet)}
                         />
                     </Pressable>
                 </View>
@@ -1264,11 +1294,13 @@ function TorrentCard({
     episodes,
     metadata,
     isSelected,
+    isCached = false,
 }: {
     torrent: HibikeTorrent_AnimeTorrent
     episodes: Anime_Episode[]
     metadata?: Habari_Metadata
     isSelected: boolean
+    isCached?: boolean
 }) {
     const cardTitle = React.useMemo(() => getTorrentCardTitle(torrent, metadata, episodes), [episodes, torrent, metadata])
     const displayReleaseGroup = metadata?.release_group || torrent.releaseGroup || ""
@@ -1368,6 +1400,13 @@ function TorrentCard({
                             </Pressable>
                         )}
                     </View>
+
+                    {isCached && (
+                        <View className="flex-row items-center gap-1.5">
+                            <Ionicons name="speedometer" size={11} color="#a4f4cf" />
+                            <Text className="text-[11px] font-medium text-emerald-200/70">Cached</Text>
+                        </View>
+                    )}
 
                     <TorrentMetadataTags metadata={metadata} />
                 </View>

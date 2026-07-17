@@ -4,6 +4,7 @@ import { SheetFooter, SheetFooterButton } from "@/components/shared/sheet-footer
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { FormField } from "@/components/ui/form-field"
 import { Text } from "@/components/ui/text"
+import mediaTags from "@/lib/search/media-tags.json"
 import {
     SEARCH_FORMATS_ANIME,
     SEARCH_FORMATS_MANGA,
@@ -12,16 +13,32 @@ import {
     SEARCH_STATUS,
     SEARCH_YEARS,
 } from "@/lib/search/search-constants"
+import { filterMediaTags, type MediaTag } from "@/lib/search/tag-filter"
 import { cn } from "@/lib/utils"
 import { COLLECTION_SORTING_OPTIONS, CollectionParams, DEFAULT_COLLECTION_PARAMS } from "@/lib/utils/filtering"
 import Ionicons from "@expo/vector-icons/Ionicons"
+import { type BottomSheetScrollViewMethods, BottomSheetTextInput } from "@gorhom/bottom-sheet"
 import * as React from "react"
-import { Pressable, ScrollView, View } from "react-native"
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native"
+
+const styles = StyleSheet.create({
+    tagSearchInput: {
+        flex: 1,
+        height: "100%",
+        paddingHorizontal: 8,
+        paddingVertical: 0,
+        fontSize: 16,
+        lineHeight: 20,
+        color: "rgba(255,255,255,0.9)",
+        includeFontPadding: false,
+    },
+})
 
 export function countActiveCollectionFilters(params: CollectionParams, type: "anime" | "manga"): number {
     let count = 0
     if (params.sorting !== "SCORE_DESC") count++
     if (params.genre && params.genre.length > 0) count++
+    if (params.tags && params.tags.length > 0) count++
     if (params.status !== null) count++
     if (params.format !== null) count++
     if (params.season !== null && type === "anime") count++
@@ -45,13 +62,67 @@ export function CollectionFilterSheet({
     onApply,
 }: CollectionFilterSheetProps) {
     const [draft, setDraft] = React.useState(params)
+    const [tagSearch, setTagSearch] = React.useState("")
+    const [keyboardGap, setKeyboardGap] = React.useState(0)
+    const tagCatalog = mediaTags as MediaTag[]
+    const scrollRef = React.useRef<BottomSheetScrollViewMethods>(null)
+    const tagInputRef = React.useRef<React.ElementRef<typeof BottomSheetTextInput>>(null)
+    const contentY = React.useRef(0)
+    const tagsY = React.useRef(0)
+    const tagFocused = React.useRef(false)
+
+    const scrollToTags = React.useCallback(() => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                scrollRef.current?.scrollTo({
+                    y: Math.max(0, contentY.current + tagsY.current - 8),
+                    animated: true,
+                })
+            })
+        })
+    }, [])
 
     // sync draft when sheet opens
     React.useEffect(() => {
-        if (open) setDraft(params)
+        if (open) {
+            setDraft(params)
+            setTagSearch("")
+            setKeyboardGap(0)
+        }
     }, [open, params])
 
+    React.useEffect(() => {
+        if (!open) {
+            tagFocused.current = false
+            return
+        }
+
+        const keyboardShown = Keyboard.addListener("keyboardDidShow", event => {
+            if (Platform.OS === "android" && tagFocused.current) {
+                setKeyboardGap(event.endCoordinates.height)
+            }
+            if (tagFocused.current) scrollToTags()
+        })
+        const keyboardHidden = Keyboard.addListener("keyboardDidHide", () => {
+            setKeyboardGap(0)
+        })
+
+        return () => {
+            keyboardShown.remove()
+            keyboardHidden.remove()
+        }
+    }, [open, scrollToTags])
+
+    React.useEffect(() => {
+        if (keyboardGap > 0 && tagFocused.current) scrollToTags()
+    }, [keyboardGap, scrollToTags])
+
     const isAnime = type === "anime"
+    const selectedTags = draft.tags ?? []
+    const tagChoices = React.useMemo(
+        () => filterMediaTags(tagCatalog, tagSearch, false, selectedTags),
+        [selectedTags, tagSearch],
+    )
 
     function toggleGenre(genre: string) {
         setDraft(d => ({
@@ -60,6 +131,22 @@ export function CollectionFilterSheet({
                 ? (d.genre ?? []).filter(g => g !== genre)
                 : [...(d.genre ?? []), genre],
         }))
+    }
+
+    function toggleTag(tag: string) {
+        setDraft(d => {
+            const tags = d.tags ?? []
+            return {
+                ...d,
+                tags: tags.includes(tag) ? tags.filter(value => value !== tag) : [...tags, tag],
+            }
+        })
+    }
+
+    function clearTagSearch() {
+        tagInputRef.current?.clear()
+        setTagSearch("")
+        tagInputRef.current?.focus()
     }
 
     function reset() {
@@ -79,6 +166,11 @@ export function CollectionFilterSheet({
             onOpenChange={onOpenChange}
             snapPoints={["90%"]}
             title="Filters"
+            keyboardBehavior="fillParent"
+            keyboardBlurBehavior="restore"
+            enableBlurKeyboardOnGesture
+            androidKeyboardInputMode="adjustResize"
+            scrollRef={scrollRef}
             footer={
                 <SheetFooter>
                     <SheetFooterButton variant="cancel" onPress={reset}>
@@ -95,7 +187,12 @@ export function CollectionFilterSheet({
                 </SheetFooter>
             }
         >
-            <View className="gap-5 pb-2">
+            <View
+                className="gap-5 pb-2"
+                onLayout={event => {
+                    contentY.current = event.nativeEvent.layout.y
+                }}
+            >
 
                 <FormField label="Sort by" icon="swap-vertical-outline">
                     <InlineSelect
@@ -183,6 +280,67 @@ export function CollectionFilterSheet({
                         onToggle={toggleGenre}
                     />
                 </FormField>
+
+                <View
+                    onLayout={event => {
+                        tagsY.current = event.nativeEvent.layout.y
+                    }}
+                >
+                    <FormField label="Tags" icon="bookmark-outline">
+                        <View className="gap-3">
+                            <View className="h-11 flex-row items-center rounded-2xl border border-white/10 bg-white/[0.04] px-3">
+                                <Ionicons name="search-outline" size={17} color="rgba(255,255,255,0.4)" />
+                                <BottomSheetTextInput
+                                    ref={tagInputRef}
+                                    defaultValue=""
+                                    onChangeText={setTagSearch}
+                                    placeholder="Find a tag"
+                                    placeholderTextColor="rgba(255,255,255,0.35)"
+                                    selectionColor="rgba(130,115,255,0.9)"
+                                    style={styles.tagSearchInput}
+                                    textAlignVertical="center"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                    returnKeyType="done"
+                                    onSubmitEditing={Keyboard.dismiss}
+                                    onFocus={() => {
+                                        tagFocused.current = true
+                                        scrollToTags()
+                                    }}
+                                    onBlur={() => {
+                                        tagFocused.current = false
+                                    }}
+                                />
+                                {tagSearch.length > 0 ? (
+                                    <Pressable onPress={clearTagSearch} hitSlop={8}>
+                                        <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.35)" />
+                                    </Pressable>
+                                ) : null}
+                            </View>
+                            {selectedTags.length > 0 ? (
+                                <MultiToggle
+                                    options={selectedTags.map(tag => ({ value: tag, label: tag }))}
+                                    values={selectedTags}
+                                    onToggle={toggleTag}
+                                />
+                            ) : null}
+                            <Text className="text-[11px] font-semibold uppercase tracking-wider text-white/35">
+                                {tagSearch.trim() ? "Matching tags" : "Popular tags"}
+                            </Text>
+                            {tagChoices.length > 0 ? (
+                                <MultiToggle
+                                    options={tagChoices.map(tag => ({ value: tag.name, label: tag.name }))}
+                                    values={selectedTags}
+                                    onToggle={toggleTag}
+                                />
+                            ) : (
+                                <Text className="py-2 text-sm text-white/35">No tags found</Text>
+                            )}
+                        </View>
+                    </FormField>
+                </View>
+
+                {keyboardGap > 0 ? <View pointerEvents="none" style={{ height: keyboardGap }} /> : null}
             </View>
         </SeaBottomSheet>
     )

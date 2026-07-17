@@ -1,3 +1,4 @@
+import { LONG_REQUEST_TIMEOUT_MS } from "@/api/client/request-control"
 import { useServerMutation, useServerQuery } from "@/api/client/requests"
 import { SaveAutoSelectProfile_Variables, SearchTorrent_Variables } from "@/api/generated/endpoint.types"
 import { API_ENDPOINTS } from "@/api/generated/endpoints"
@@ -12,6 +13,7 @@ export function useSearchTorrent(variables: SearchTorrent_Variables, enabled: bo
         queryKey: [API_ENDPOINTS.TORRENT_SEARCH.SearchTorrent.key, JSON.stringify(variables)],
         enabled: enabled,
         gcTime: variables.episodeNumber === 0 ? 0 : undefined,
+        timeoutMs: LONG_REQUEST_TIMEOUT_MS,
     })
 }
 

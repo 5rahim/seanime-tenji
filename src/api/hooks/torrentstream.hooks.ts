@@ -1,3 +1,4 @@
+import { LONG_REQUEST_TIMEOUT_MS } from "@/api/client/request-control"
 import { useServerMutation, useServerQuery } from "@/api/client/requests"
 import {
     GetTorrentstreamBatchHistory_Variables,
@@ -10,12 +11,12 @@ import { Models_TorrentstreamSettings, Nullish, Torrentstream_BatchHistoryRespon
 import { toast } from "@/lib/utils/toast"
 import { useQueryClient } from "@tanstack/react-query"
 
-export function useGetTorrentstreamSettings() {
+export function useGetTorrentstreamSettings(enabled: boolean = true) {
     return useServerQuery<Models_TorrentstreamSettings>({
         endpoint: API_ENDPOINTS.TORRENTSTREAM.GetTorrentstreamSettings.endpoint,
         method: API_ENDPOINTS.TORRENTSTREAM.GetTorrentstreamSettings.methods[0],
         queryKey: [API_ENDPOINTS.TORRENTSTREAM.GetTorrentstreamSettings.key],
-        enabled: true,
+        enabled,
     })
 }
 
@@ -32,11 +33,13 @@ export function useSaveTorrentstreamSettings() {
     })
 }
 
-export function useTorrentstreamStartStream() {
+export function useTorrentstreamStartStream(options?: { muteError?: boolean }) {
     return useServerMutation<boolean, TorrentstreamStartStream_Variables>({
         endpoint: API_ENDPOINTS.TORRENTSTREAM.TorrentstreamStartStream.endpoint,
         method: API_ENDPOINTS.TORRENTSTREAM.TorrentstreamStartStream.methods[0],
         mutationKey: [API_ENDPOINTS.TORRENTSTREAM.TorrentstreamStartStream.key],
+        timeoutMs: LONG_REQUEST_TIMEOUT_MS,
+        muteError: options?.muteError,
         onSuccess: async () => {
         },
     })

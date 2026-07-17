@@ -12,6 +12,7 @@ import {
     useDiscoverCurrentSeasonAnime,
     useDiscoverMissedSequels,
     useDiscoverPastSeasonAnime,
+    useDiscoverRecentlyAired,
     useDiscoverTrendingAnime,
     useDiscoverTrendingManga,
     useDiscoverTrendingMovies,
@@ -42,12 +43,16 @@ type DiscoverMode = "anime" | "manga"
 const DISCOVER_SECTION_HEADER_HEIGHT = 56
 const DISCOVER_ANIME_SECTION_ITEMS = [
     { key: "trending" },
+    { key: "aired-recently" },
     { key: "current-season" },
     { key: "past-season" },
     { key: "upcoming" },
     { key: "movies" },
     { key: "missed" },
 ] as const
+const DISCOVER_ANIME_SECTION_INDEX = Object.fromEntries(
+    DISCOVER_ANIME_SECTION_ITEMS.map((item, index) => [item.key, index]),
+) as Record<DiscoverAnimeSectionItem["key"], number>
 const DISCOVER_MANGA_SECTION_ITEMS = [
     { key: "jp" },
     { key: "kr" },
@@ -400,18 +405,20 @@ function DiscoverAnimeSections({
     onChangeMode: (mode: DiscoverMode) => void
 }) {
     const { isSectionActivated, onViewableItemsChanged, viewabilityConfig } = useDiscoverSectionActivation(DISCOVER_ANIME_SECTION_ITEMS.length)
-    const trendingEnabled = isSectionActivated(0)
-    const currentSeasonEnabled = isSectionActivated(1)
-    const pastSeasonEnabled = isSectionActivated(2)
-    const missedEnabled = isSectionActivated(3)
-    const upcomingEnabled = isSectionActivated(4)
-    const moviesEnabled = isSectionActivated(5)
+    const trendingEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX.trending)
+    const recentlyAiredEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX["aired-recently"])
+    const currentSeasonEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX["current-season"])
+    const pastSeasonEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX["past-season"])
+    const upcomingEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX.upcoming)
+    const moviesEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX.movies)
+    const missedEnabled = isSectionActivated(DISCOVER_ANIME_SECTION_INDEX.missed)
 
     const { data: trending, isLoading: trendingLoading } = useDiscoverTrendingAnime(
         trendingEnabled,
         selectedTrendingGenre ? [selectedTrendingGenre] : undefined,
     )
     const { data: currentSeason, isLoading: currentSeasonLoading } = useDiscoverCurrentSeasonAnime(currentSeasonEnabled)
+    const { media: recentlyAiredMedia, isLoading: recentlyAiredLoading } = useDiscoverRecentlyAired(recentlyAiredEnabled)
     const { data: pastSeason, isLoading: pastSeasonLoading } = useDiscoverPastSeasonAnime(pastSeasonEnabled)
     const { data: missedSequels, isLoading: missedLoading } = useDiscoverMissedSequels(missedEnabled)
     const { data: upcoming, isLoading: upcomingLoading } = useDiscoverUpcomingAnime(upcomingEnabled)
@@ -455,7 +462,7 @@ function DiscoverAnimeSections({
                                 type="anime"
                                 enabled={trendingEnabled}
                                 isLoading={trendingLoading}
-                                sectionIndex={0}
+                                sectionIndex={DISCOVER_ANIME_SECTION_INDEX.trending}
                                 media={trendingMedia}
                                 onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                                 showAudienceScore
@@ -470,8 +477,22 @@ function DiscoverAnimeSections({
                             type="anime"
                             enabled={currentSeasonEnabled}
                             isLoading={currentSeasonLoading}
-                            sectionIndex={1}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX["current-season"]}
                             media={currentSeasonMedia}
+                            onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
+                            showAudienceScore
+                            hideCount
+                        />
+                    )
+                case "aired-recently":
+                    return (
+                        <DiscoverHorizontalSection
+                            title="Aired Recently"
+                            type="anime"
+                            enabled={recentlyAiredEnabled}
+                            isLoading={recentlyAiredLoading}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX["aired-recently"]}
+                            media={recentlyAiredMedia}
                             onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                             showAudienceScore
                             hideCount
@@ -484,7 +505,7 @@ function DiscoverAnimeSections({
                             type="anime"
                             enabled={pastSeasonEnabled}
                             isLoading={pastSeasonLoading}
-                            sectionIndex={2}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX["past-season"]}
                             media={pastSeasonMedia}
                             onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                             showAudienceScore
@@ -498,7 +519,7 @@ function DiscoverAnimeSections({
                             type="anime"
                             enabled={upcomingEnabled}
                             isLoading={upcomingLoading}
-                            sectionIndex={3}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX.upcoming}
                             media={upcomingMedia}
                             onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                             showAudienceScore
@@ -512,7 +533,7 @@ function DiscoverAnimeSections({
                             type="anime"
                             enabled={moviesEnabled}
                             isLoading={moviesLoading}
-                            sectionIndex={4}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX.movies}
                             media={moviesMedia}
                             onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                             showAudienceScore
@@ -526,7 +547,7 @@ function DiscoverAnimeSections({
                             type="anime"
                             enabled={missedEnabled}
                             isLoading={missedLoading}
-                            sectionIndex={5}
+                            sectionIndex={DISCOVER_ANIME_SECTION_INDEX.missed}
                             media={missedMedia}
                             onMediaPress={(m) => router.push(`/(app)/entry/anime/${m.id}`)}
                             showAudienceScore
@@ -537,7 +558,8 @@ function DiscoverAnimeSections({
         },
         [currentSeasonEnabled, currentSeasonLoading, currentSeasonMedia, missedEnabled, missedLoading, missedMedia, moviesEnabled, moviesLoading,
             moviesMedia, onChangeTrendingGenre, pastSeasonEnabled, pastSeasonLoading, pastSeasonMedia, selectedTrendingGenre, trendingEnabled,
-            trendingGenreOptions, trendingLoading, trendingMedia, upcomingEnabled, upcomingLoading, upcomingMedia])
+            trendingGenreOptions, trendingLoading, trendingMedia, upcomingEnabled, upcomingLoading, upcomingMedia, recentlyAiredEnabled,
+            recentlyAiredLoading, recentlyAiredMedia])
 
     return (
         <Animated.FlatList

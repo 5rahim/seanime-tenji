@@ -1,6 +1,6 @@
+import { subscribeWsMessage } from "@/api/components/websocket-hub"
 import { useScanLocalFiles } from "@/api/hooks/scan.hooks"
 import { useCurrentUser } from "@/atoms/server.atoms"
-import { websocketAtom } from "@/atoms/websocket.atoms"
 import { ExternalPlayerPickerSheet } from "@/components/features/player/external-player-picker-sheet"
 import { ProfileMenuItem, ProfileMenuSection, ProfileMenuToggle, RowDivider } from "@/components/features/profile/profile-menu"
 import { SafeView } from "@/components/layout/layout-view"
@@ -43,30 +43,18 @@ export default function ProfileScreen() {
     const isServerConnected = useIsServerConnected()
     const isLocalServer = useIsLocalServer()
 
-    const socket = useAtomValue(websocketAtom)
     const [scanProgress, setScanProgress] = React.useState<number | null>(null)
     const [scanStatus, setScanStatus] = React.useState<string | null>(null)
 
     React.useEffect(() => {
-        if (!socket) return
-
-        const handleMessage = (event: WebSocketMessageEvent) => {
-            try {
-                const data = JSON.parse(event.data) as { type?: string; payload?: any }
-                if (data?.type === "scan-progress") {
-                    setScanProgress(data.payload as number)
-                } else if (data?.type === "scan-status") {
-                    setScanStatus(data.payload as string)
-                }
+        return subscribeWsMessage(message => {
+            if (message.type === "scan-progress" && typeof message.payload === "number") {
+                setScanProgress(message.payload)
+            } else if (message.type === "scan-status" && typeof message.payload === "string") {
+                setScanStatus(message.payload)
             }
-            catch (e) {
-                // ignore
-            }
-        }
-
-        socket.addEventListener("message", handleMessage)
-        return () => socket.removeEventListener("message", handleMessage)
-    }, [socket])
+        })
+    }, [])
 
     React.useEffect(() => {
         if (scanProgress === 100) {

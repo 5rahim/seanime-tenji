@@ -1,4 +1,5 @@
 import { getClientHeaders, saveClientIdentityFromHeaders } from "@/api/client/client-identity"
+import { createRequestControl, DEFAULT_REQUEST_TIMEOUT_MS } from "@/api/client/request-control"
 import { getServerAuthHeaders } from "@/api/client/server-auth"
 import { getServerBaseUrl } from "@/api/client/server-url"
 import { getStoredServerAuthToken, useServerAuthToken, useServerUrl, useSetServerAuthToken } from "@/atoms/server.atoms"
@@ -25,6 +26,8 @@ type SeaQuery<D> = {
     authToken?: string | null
     muteError?: boolean
     bypassOfflineCheck?: boolean
+    timeoutMs?: number
+    signal?: AbortSignal | readonly (AbortSignal | undefined)[]
 }
 
 function createSeaError(message: string, status?: number): SeaError {
@@ -81,6 +84,8 @@ export async function buildSeaQuery<T, D = unknown>(
         authToken,
         muteError,
         bypassOfflineCheck,
+        timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+        signal,
     }: SeaQuery<D>): Promise<T | undefined> {
     const url = new URL(getServerBaseUrl(serverUrl) + endpoint)
     const resolvedAuthToken = authToken ?? getStoredServerAuthToken()
@@ -112,6 +117,9 @@ export async function buildSeaQuery<T, D = unknown>(
     if (isManualOfflineModeEnabled() && !bypassOfflineCheck) {
         return Promise.reject(createSeaError("OFFLINE_MODE_ENABLED"))
     }
+
+    const request = createRequestControl(signal, timeoutMs)
+    options.signal = request.signal
 
     try {
         const response = await fetch(url.toString(), options)
@@ -149,8 +157,13 @@ export async function buildSeaQuery<T, D = unknown>(
         return responseData?.data as T
     }
     catch (error: unknown) {
-        const seaError = normalizeSeaError(error)
-        const wasAborted = error instanceof Error && error.name === "AbortError"
+        const timedOut = request.didTimeout()
+        const wasAborted = request.signal.aborted && !timedOut
+        if (wasAborted) throw error
+
+        const seaError = timedOut
+            ? createSeaError(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds`)
+            : normalizeSeaError(error)
         const connectivityFailure = isConnectivityFailure(error, seaError)
 
         if (connectivityFailure) {
@@ -164,19 +177,25 @@ export async function buildSeaQuery<T, D = unknown>(
         }, seaError)
         // only show toast when we believe the device is online, avoids
         // spamming "Network request failed" toasts while offline
-        if (!wasAborted && !muteError && isGlobalConnected()) {
-            toast.error("An error occurred: " + seaError.error, {
+        if (!muteError && isGlobalConnected()) {
+            toast.error(_handleSeaError(seaError.error), {
                 visibilityTime: 5000,
             })
         }
         // Return the error message as rejected promise to be handled by tsquery
         return Promise.reject(seaError)
     }
+    finally {
+        request.clear()
+    }
 }
 
 type ServerMutationProps<R, V = void> = UseMutationOptions<R | undefined, SeaError, V, unknown> & {
     endpoint: string
     method: "POST" | "GET" | "PATCH" | "DELETE" | "PUT"
+    timeoutMs?: number
+    signal?: AbortSignal
+    muteError?: boolean
 }
 
 export function useServerMutation<R = void, V = void>(
@@ -184,6 +203,9 @@ export function useServerMutation<R = void, V = void>(
         endpoint,
         method,
         onError: userOnError,
+        timeoutMs,
+        signal,
+        muteError,
         ...options
     }: ServerMutationProps<R, V>) {
 
@@ -199,11 +221,6 @@ export function useServerMutation<R = void, V = void>(
                 return
             }
 
-            // suppress error toasts when the device is offline
-            if (isGlobalConnected()) {
-                toast.error(_handleSeaError(error.error))
-            }
-
             userOnError?.(error, variables, onMutateResult, mutationContext)
         },
         mutationFn: async (variables) => {
@@ -213,6 +230,9 @@ export function useServerMutation<R = void, V = void>(
                 method: method,
                 data: variables,
                 authToken,
+                timeoutMs,
+                signal,
+                muteError,
             })
         },
         ...options,
@@ -226,6 +246,8 @@ type ServerQueryProps<R, V> = UseQueryOptions<R | undefined, SeaError, R | undef
     params?: V
     data?: V
     muteError?: boolean
+    timeoutMs?: number
+    signal?: AbortSignal
 }
 
 export function useServerQuery<R, V = any>(
@@ -235,6 +257,8 @@ export function useServerQuery<R, V = any>(
         params,
         data,
         muteError,
+        timeoutMs,
+        signal,
         ...options
     }: ServerQueryProps<R | undefined, V>) {
     const serverUrl = useServerUrl()
@@ -242,7 +266,7 @@ export function useServerQuery<R, V = any>(
     const setServerAuthToken = useSetServerAuthToken()
 
     const props = useQuery<R | undefined, SeaError>({
-        queryFn: async () => {
+        queryFn: async ({ signal: querySignal }) => {
             return buildSeaQuery<R, V>({
                 serverUrl: serverUrl,
                 endpoint: endpoint,
@@ -251,6 +275,8 @@ export function useServerQuery<R, V = any>(
                 data: data,
                 authToken,
                 muteError,
+                timeoutMs,
+                signal: [signal, querySignal],
             })
         },
         ...options,
@@ -265,10 +291,7 @@ export function useServerQuery<R, V = any>(
             return
         }
 
-        if (!muteError && isGlobalConnected()) {
-            toast.error(_handleSeaError(props.error?.error))
-        }
-    }, [props.error, props.isError, muteError, setServerAuthToken])
+    }, [props.error, props.isError, setServerAuthToken])
 
     return props
 }

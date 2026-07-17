@@ -11,7 +11,13 @@ import type { SideAdjustKind } from "../types"
 
 const ANDROID_BRIGHTNESS_WRITE_INTERVAL_MS = 80
 
-export function useSideAdjust() {
+export function useSideAdjust(
+    // savedLevel: number | null,
+    // saveLevel: (value: number) => void,
+) {
+    // const savedLevelRef = React.useRef(savedLevel)
+    // const saveLevelRef = React.useRef(saveLevel)
+    // saveLevelRef.current = saveLevel
     const brightnessLevelRef = React.useRef(0.5)
     const didSyncBrightnessRef = React.useRef(false)
     const initialBrightnessRef = React.useRef(0.5)
@@ -27,6 +33,7 @@ export function useSideAdjust() {
     const brightnessWriteTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const pendingBrightnessValueRef = React.useRef<number | null>(null)
     const lastBrightnessWriteAtRef = React.useRef(0)
+    // const lastSavedLevelRef = React.useRef(savedLevel)
     const pendingSideAdjustRef = React.useRef<{ kind: SideAdjustKind; value: number } | null>(null)
     const sideAdjustFrameRef = React.useRef<number | null>(null)
     const sideAdjustProgress = useSharedValue(0.5)
@@ -43,13 +50,25 @@ export function useSideAdjust() {
             try {
                 const brightness = await Brightness.getBrightnessAsync()
                 if (mounted) {
-                    brightnessLevelRef.current = brightness
+                    let level = brightness
+
+                    // if (savedLevelRef.current !== null) {
+                    //     level = clamp(savedLevelRef.current, 0, 1)
+                    //     didOverrideBrightnessRef.current = true
+                    //     if (Platform.OS === "android") {
+                    //         MpvPlayerModule.setWindowBrightness(level)
+                    //     } else {
+                    //         void Brightness.setBrightnessAsync(level).catch(() => undefined)
+                    //     }
+                    // }
+
+                    brightnessLevelRef.current = level
                     didSyncBrightnessRef.current = true
                     if (!hasInitialBrightnessRef.current && !didOverrideBrightnessRef.current) {
                         initialBrightnessRef.current = brightness
                         hasInitialBrightnessRef.current = true
                     }
-                    sideAdjustProgress.set(brightness)
+                    sideAdjustProgress.set(level)
                 }
             }
             catch {
@@ -131,10 +150,17 @@ export function useSideAdjust() {
         return () => {
             if (sideAdjustFrameRef.current !== null) cancelAnimationFrame(sideAdjustFrameRef.current)
             if (sideAdjustHideTimerRef.current) clearTimeout(sideAdjustHideTimerRef.current)
+            // flushPendingBrightness()
             if (brightnessWriteTimerRef.current !== null) clearTimeout(brightnessWriteTimerRef.current)
             pendingBrightnessValueRef.current = null
 
             if (!didOverrideBrightnessRef.current) return
+
+            // const level = brightnessLevelRef.current
+            // if (lastSavedLevelRef.current !== level) {
+            //     lastSavedLevelRef.current = level
+            //     saveLevelRef.current(level)
+            // }
 
             // Android brightness gestures use an activity override, so restore the
             // previous app/system behavior when the player closes.
@@ -159,6 +185,12 @@ export function useSideAdjust() {
     const scheduleSideAdjustHide = React.useCallback(() => {
         clearSideAdjustHideTimer()
         flushPendingBrightness()
+
+        // const level = brightnessLevelRef.current
+        // if (didOverrideBrightnessRef.current && lastSavedLevelRef.current !== level) {
+        //     lastSavedLevelRef.current = level
+        //     saveLevelRef.current(level)
+        // }
 
         if (Platform.OS === "android") {
             setTimeout(() => {

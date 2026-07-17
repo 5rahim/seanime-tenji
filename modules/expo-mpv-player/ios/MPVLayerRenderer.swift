@@ -44,8 +44,6 @@ final class MPVLayerRenderer {
 
     // KVO observation for display layer status
     private var statusObservation: NSKeyValueObservation?
-    private var appObservers: [NSObjectProtocol] = []
-    private var wasBackgrounded = false
 
     weak var delegate: MPVLayerRendererDelegate?
 
@@ -107,123 +105,29 @@ final class MPVLayerRenderer {
 
     init(displayLayer: AVSampleBufferDisplayLayer) {
         self.displayLayer = displayLayer
-        observeLayerStatus()
-        observeAppState()
+        observeDisplayLayerStatus()
     }
 
     deinit {
-        removeAppObservers()
         stop()
     }
 
     // MARK: - Display Layer Recovery
 
-    private func observeLayerStatus() {
-        if #available(iOS 18.0, *) {
-            statusObservation = displayLayer.sampleBufferRenderer.observe(\.status, options: [.new]) { [weak self] renderer, _ in
-                self?.onLayerStatus(renderer.status)
-            }
-        } else {
-            statusObservation = displayLayer.observe(\.status, options: [.new]) { [weak self] layer, _ in
-                self?.onLayerStatus(layer.status)
+    private func observeDisplayLayerStatus() {
+        statusObservation = displayLayer.observe(\.status, options: [.new]) { [weak self] layer, _ in
+            guard let self else { return }
+            if layer.status == .failed {
+                print("[MPV] Display layer failed - auto-resetting decoder")
+                self.queue.async { self.performDecoderReset() }
             }
         }
     }
 
-    private func onLayerStatus(_ status: AVQueuedSampleBufferRenderingStatus) {
-        guard status == .failed else { return }
-        print("[MPV] Display layer failed - auto-resetting decoder")
-        queue.async { [weak self] in
-            guard let self, self.needsReset() else { return }
-            self.resetDecoder()
-        }
-    }
-
-    private func needsReset() -> Bool {
-        let readState = { [displayLayer] in
-            if #available(iOS 18.0, *) {
-                let renderer = displayLayer.sampleBufferRenderer
-                return renderer.status == .failed || renderer.requiresFlushToResumeDecoding
-            } else {
-                return displayLayer.status == .failed || displayLayer.requiresFlushToResumeDecoding
-            }
-        }
-
-        if Thread.isMainThread {
-            return readState()
-        }
-        return DispatchQueue.main.sync(execute: readState)
-    }
-
-    private func flushLayer() {
-        let flush = { [displayLayer] in
-            if #available(iOS 18.0, *) {
-                displayLayer.sampleBufferRenderer.flush()
-            } else {
-                displayLayer.flush()
-            }
-        }
-
-        if Thread.isMainThread {
-            flush()
-        } else {
-            DispatchQueue.main.sync(execute: flush)
-        }
-    }
-
-    private func resetDecoder() {
+    private func performDecoderReset() {
         guard let handle = mpv else { return }
-
-        flushLayer()
         commandSync(handle, ["set", "hwdec", "no"])
-        #if !targetEnvironment(simulator)
-        commandSync(handle, ["set", "hwdec", "videotoolbox"])
-        #endif
-
-        let position = cachedPosition
-        commandSync(handle, ["seek", String(position), "absolute"])
-    }
-
-    private func observeAppState() {
-        let center = NotificationCenter.default
-        appObservers.append(
-            center.addObserver(
-                forName: UIApplication.didEnterBackgroundNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                self?.wasBackgrounded = true
-            }
-        )
-        appObservers.append(
-            center.addObserver(
-                forName: UIApplication.didBecomeActiveNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                guard let self, self.wasBackgrounded else { return }
-                self.wasBackgrounded = false
-                self.onAppResume()
-            }
-        )
-    }
-
-    private func removeAppObservers() {
-        let center = NotificationCenter.default
-        appObservers.forEach(center.removeObserver)
-        appObservers.removeAll()
-    }
-
-    private func onAppResume() {
-        queue.async { [weak self] in
-            guard let self, let handle = self.mpv else { return }
-            if self.needsReset() {
-                self.resetDecoder()
-            } else {
-                let position = self.cachedPosition
-                self.commandSync(handle, ["seek", String(position), "absolute"])
-            }
-        }
+        commandSync(handle, ["set", "hwdec", "auto"])
     }
 
     // MARK: - Lifecycle
@@ -293,7 +197,6 @@ final class MPVLayerRenderer {
 
         statusObservation?.invalidate()
         statusObservation = nil
-        removeAppObservers()
 
         let handle = mpv
         mpv = nil
