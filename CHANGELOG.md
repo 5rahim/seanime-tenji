@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0
+
+- ⚡️ UI: Handling of larger screen sizes
+- ⚡️ Player(Android): Use gpu-next for hardware decoding by default
+- ⚡️ Player(Android): Support for mpvEX
+- ⚡️ Playback: Support watching downloaded episodes in external player
+- ⚡️ Player(iOS): Pause playback when phone locks
+- ⚡️ Torrent streaming: Preload next episode when enabled
+- ⚡️ Debrid streaming: Show cached torrent indicator
+- ⚡️ Discover: Aired Recently section
+- ⚡️ Schedule: Missing and upcoming episodes
+- ⚡️ Search: Tag and minimum score filters
+- ⚡️ My List: Tag filters
+- 🦺 Download: Handling of episodes with multiple files
+- 🦺 Playback: Fixed continuity updates using stale progress
+- 🦺 Settings: Refresh app data when server settings change
+- 🦺 Discover: Fixed sections loading the wrong data
+- 🦺 UI: Restrict anime entry bottom bar width on larger screens
+- 🦺 Core: Added cancellation and timeout handling
+- 🦺 Core: Refactored websocket handling
+
 ## v0.1.21
 
 - ⚡️ Refactored support for mobile server downloads
