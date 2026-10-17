@@ -18,6 +18,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
@@ -64,6 +65,33 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     private val pipHandler = Handler(Looper.getMainLooper())
     private val recoverRunnable = Runnable { recoverVideoOutput() }
+
+    // The SurfaceView makes the window keep a transparent-region hint for SurfaceFlinger, but Android only
+    // recomputes that hint during a full layout traversal, which Fabric's mounting doesn't trigger. On Android TV
+    // (seen on an NVIDIA Shield) the hint went stale, e.g. [0,24,1920,1080], and SurfaceFlinger cropped the app
+    // layer to a thin strip, so the player controls and dialogs were mounted but never shown over the video.
+    // After a redraw, request one layout pass so the hint is rebuilt; the draw caused by that pass is skipped
+    // so this doesn't loop.
+    private var transparentRegionRefreshPosted = false
+    private var skipNextDrawForRegionRefresh = false
+    private val refreshTransparentRegion = Runnable {
+        transparentRegionRefreshPosted = false
+        skipNextDrawForRegionRefresh = true
+        rootView?.requestLayout()
+    }
+    private val transparentRegionDrawListener = ViewTreeObserver.OnDrawListener {
+        if (skipNextDrawForRegionRefresh) {
+            skipNextDrawForRegionRefresh = false
+        } else if (!transparentRegionRefreshPosted) {
+            transparentRegionRefreshPosted = true
+            pipHandler.postDelayed(refreshTransparentRegion, 30)
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        viewTreeObserver.addOnDrawListener(transparentRegionDrawListener)
+    }
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -513,6 +541,8 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     }
 
     override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnDrawListener(transparentRegionDrawListener)
+        pipHandler.removeCallbacks(refreshTransparentRegion)
         super.onDetachedFromWindow()
         cleanup()
     }
