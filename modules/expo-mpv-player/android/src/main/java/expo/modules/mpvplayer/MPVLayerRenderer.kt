@@ -162,6 +162,9 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
 
         // cache & demuxer
         MPVLib.setOptionString("cache", "auto")
+        // On Android TV, give up on a stalled network read after a few seconds and reconnect
+        // (see the lavf:// note in load()) instead of leaving playback stuck on the spinner.
+        if (isTv) MPVLib.setOptionString("network-timeout", "5")
         MPVLib.setOptionString("cache-secs", "10")
         MPVLib.setOptionString("cache-pause-initial", "yes")
         MPVLib.setOptionString("demuxer-max-bytes", if (isTv) "75MiB" else "150MiB")
@@ -388,7 +391,11 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
 
         MPVLib.setPropertyDouble("video-zoom", log2(requestedVideoZoomScale.coerceAtLeast(1.0)))
 
-        MPVLib.command(arrayOf("loadfile", url, "replace"))
+        // On Android TV, open http(s) sources through FFmpeg's protocol (lavf://). On the Shield, mpv's
+        // libcurl stream could stall indefinitely after a couple of quick seeks; FFmpeg's reader honours
+        // network-timeout and reconnects.
+        val loadUrl = if (isTv && (url.startsWith("http://") || url.startsWith("https://"))) "lavf://$url" else url
+        MPVLib.command(arrayOf("loadfile", loadUrl, "replace"))
     }
 
     // -------------------------------------------------------------------
