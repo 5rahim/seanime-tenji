@@ -630,14 +630,14 @@ function Delay({
 function VideoOutput(props: Props & { preferred: boolean }) {
     const rows: Array<{ value: MpvVideoOutput; label: string; detail: string }> = [
         {
-            value: "gpu-next",
-            label: "Modern",
-            detail: "Recommended for current Android TV devices.",
-        },
-        {
             value: "gpu",
             label: "Compatibility",
-            detail: "Use if the modern renderer has visual problems.",
+            detail: "Recommended for Android TV devices and zero-copy MediaCodec playback.",
+        },
+        {
+            value: "gpu-next",
+            label: "Modern",
+            detail: "Uses libplacebo. May cause frame timeouts or artifacts on some TV GPUs.",
         },
     ]
 

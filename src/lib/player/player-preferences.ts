@@ -1,5 +1,6 @@
 import type { MpvVideoOutput } from "expo-mpv-player"
 import React from "react"
+import { Platform } from "react-native"
 import { createMMKV } from "react-native-mmkv"
 
 const storage = createMMKV({ id: "seanime-player-prefs" })
@@ -54,7 +55,7 @@ export type PlayerPreferences = {
      * Null means use the built-in mpv player.
      */
     externalPlayerTemplate: string | null
-    /** mpv video output. gpu-next is the default. */
+    /** mpv video output. Defaults to gpu on Android TV for zero-copy MediaCodec stability, and gpu-next on phones/tablets. */
     androidVideoOutput: MpvVideoOutput
     /** Whether to show live playback diagnostics over the video. */
     showStats: boolean
@@ -81,7 +82,7 @@ const DEFAULTS: PlayerPreferences = {
     autoSkipOpEd: false,
     wyzieApiKey: "",
     externalPlayerTemplate: null,
-    androidVideoOutput: "gpu-next",
+    androidVideoOutput: Platform.isTV ? "gpu" : "gpu-next",
     showStats: false,
 }
 

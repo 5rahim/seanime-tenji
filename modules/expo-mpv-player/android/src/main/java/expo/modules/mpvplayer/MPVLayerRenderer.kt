@@ -105,8 +105,11 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
     private var initialized = false
     private var surface: Surface? = null
 
+    val isTv: Boolean = isTvDevice()
+    private val emulator: Boolean = isEmulator()
+
     @Volatile
-    private var videoOutput: VideoOutput = VideoOutput.GPU_NEXT
+    private var videoOutput: VideoOutput = if (isTv) VideoOutput.GPU else VideoOutput.GPU_NEXT
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile
     private var statsLogged = false
@@ -116,8 +119,6 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         logStats()
     }
 
-    val isTv: Boolean = isTvDevice()
-    private val emulator: Boolean = isEmulator()
     private val requestedHwdec: String = when {
         emulator -> "no"
         isTv -> "mediacodec,mediacodec-copy"
