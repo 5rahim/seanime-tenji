@@ -113,7 +113,7 @@ export function useContinuitySync(
 
         const ratio = playerState.currentTime / playerState.duration
 
-        if (ratio >= COMPLETION_THRESHOLD || playerState.eofReached) {
+        if (ratio >= COMPLETION_THRESHOLD) {
             hasSyncedCompletion.current = true
             log.info(`Episode completed (${Math.round(ratio * 100)}%), syncing progress`)
 
@@ -124,7 +124,7 @@ export function useContinuitySync(
                 totalEpisodes: source.media?.episodes || 0,
             })
         }
-    }, [source, playerState.currentTime, playerState.duration, playerState.eofReached, updateAnimeProgress])
+    }, [source, playerState.currentTime, playerState.duration, updateAnimeProgress])
 
     // Reset completion flag when source changes
     React.useEffect(() => {

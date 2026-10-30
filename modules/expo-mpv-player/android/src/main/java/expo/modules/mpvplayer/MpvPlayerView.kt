@@ -18,6 +18,7 @@ import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
@@ -64,6 +65,27 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     private val pipHandler = Handler(Looper.getMainLooper())
     private val recoverRunnable = Runnable { recoverVideoOutput() }
+
+    private var transparentRegionRefreshPosted = false
+    private var skipNextDrawForRegionRefresh = false
+    private val refreshTransparentRegion = Runnable {
+        transparentRegionRefreshPosted = false
+        skipNextDrawForRegionRefresh = true
+        rootView?.requestLayout()
+    }
+    private val transparentRegionDrawListener = ViewTreeObserver.OnDrawListener {
+        if (skipNextDrawForRegionRefresh) {
+            skipNextDrawForRegionRefresh = false
+        } else if (!transparentRegionRefreshPosted) {
+            transparentRegionRefreshPosted = true
+            postDelayed(refreshTransparentRegion, 30)
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (renderer?.isTv == true) viewTreeObserver.addOnDrawListener(transparentRegionDrawListener)
+    }
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -513,6 +535,9 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     }
 
     override fun onDetachedFromWindow() {
+        viewTreeObserver.removeOnDrawListener(transparentRegionDrawListener)
+        removeCallbacks(refreshTransparentRegion)
+        transparentRegionRefreshPosted = false
         super.onDetachedFromWindow()
         cleanup()
     }

@@ -185,7 +185,9 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         MPVLib.setOptionString("sub-ass-force-margins", "yes")
 
         // network reconnection
-        MPVLib.setOptionString("stream-lavf-o", "reconnect=1,reconnect_streamed=1,reconnect_delay_max=5")
+        // TV reads time out after 5s (see load()), so keep retrying long enough to outlast a torrent waiting on pieces
+        val reconnectDelayMax = if (isTv) 60 else 5
+        MPVLib.setOptionString("stream-lavf-o", "reconnect=1,reconnect_streamed=1,reconnect_delay_max=$reconnectDelayMax")
 
         // playback behavior
         MPVLib.setOptionString("force-window", "no")
@@ -388,7 +390,13 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
 
         MPVLib.setPropertyDouble("video-zoom", log2(requestedVideoZoomScale.coerceAtLeast(1.0)))
 
-        MPVLib.command(arrayOf("loadfile", url, "replace"))
+        if (isTv) {
+            val isHls = url.substringBefore('?').endsWith(".m3u8")
+            MPVLib.setPropertyString("network-timeout", if (isHls) "60" else "5")
+        }
+
+        val loadUrl = if (isTv && url.startsWith("http://")) "lavf://$url" else url
+        MPVLib.command(arrayOf("loadfile", loadUrl, "replace"))
     }
 
     // -------------------------------------------------------------------

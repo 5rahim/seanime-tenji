@@ -41,7 +41,8 @@ export function useAutoNextEpisode(params: UseAutoNextEpisodeParams) {
 
     // start countdown
     React.useEffect(() => {
-        if (!sourceId || !autoNextEnabled || !canAutoAdvance || paused || isPiPActive) {
+        // mpv runs with keep-open, so it reports paused once the file ends; don't treat that as a user pause.
+        if (!sourceId || !autoNextEnabled || !canAutoAdvance || (paused && !eofReached) || isPiPActive) {
             setAutoNextCountdown(null)
             return
         }

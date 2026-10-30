@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0
+
+- 🦺 Player(Android TV): Fixed controls and dialogs hidden behind video
+- 🦺 Player(Android TV): Fixed playback getting stuck after quick seeks
+- 🦺 Player: Fixed Up next countdown cancelling at the end of an episode
+- 🦺 Playback: Fixed episodes marked as watched when a stream fails
+
 ## v0.3.0
 
 - 🎉 New Releases: AndroidTV and tvOS
