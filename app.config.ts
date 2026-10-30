@@ -119,6 +119,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             "./plugins/withLibcppPickFirst",
             "./plugins/withPiPSupport",
             "./plugins/withMPVKitiOS",
+            "./plugins/withPodDeploymentTarget",
             "./plugins/withExpoDownloadManageriOS",
             "./plugins/withExpoOfflineLoggeriOS",
             "expo-updates",

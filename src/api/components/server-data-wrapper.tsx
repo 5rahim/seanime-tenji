@@ -49,7 +49,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
 
     const [manualOffline, setManualOffline] = useManualOfflineMode()
 
-    const { data: _serverStatus, isLoading } = useGetStatus({ enabled: !manualOffline })
+    const { data: _serverStatus, isLoading, isFetchedAfterMount, isError } = useGetStatus({ enabled: !manualOffline })
 
     React.useEffect(() => {
         if (_serverStatus) {
@@ -60,6 +60,7 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
     // use either fresh or cached status, don't block on network
     const effectiveStatus = _serverStatus || cachedStatus
     const requiresServerAuth = !!effectiveStatus?.serverHasPassword
+    const freshStatus = isFetchedAfterMount && !isError ? _serverStatus : undefined
     const isUnsupportedServerVersion = !!_serverStatus && !isServerVersionSupported(_serverStatus.version)
     const authVerification = useGetSettings({
         enabled: requiresServerAuth && !!serverAuthToken && !manualOffline,
@@ -105,13 +106,13 @@ export function ServerDataWrapper({ children }: { children: React.ReactNode }) {
 
     React.useEffect(() => {
         if (manualOffline) return
-        if (!requiresServerAuth) return
+        if (!freshStatus?.serverHasPassword) return
 
         if (!serverAuthToken || isInvalidServerAuth) {
             setServerStatus(null)
             router.replace("/(out)/set-server-url")
         }
-    }, [isInvalidServerAuth, requiresServerAuth, serverAuthToken, setServerStatus, manualOffline])
+    }, [freshStatus?.serverHasPassword, isInvalidServerAuth, serverAuthToken, setServerStatus, manualOffline])
 
     if (manualOffline) {
         return <ApiLoaders>

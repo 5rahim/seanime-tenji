@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { IMAGES } from "@/constants/images"
 import { logger } from "@/lib/utils/logger"
 import { toast } from "@/lib/utils/toast"
+import { useQueryClient } from "@tanstack/react-query"
 import { router } from "expo-router"
 import * as React from "react"
 import { Image, KeyboardAvoidingView, Platform, Text, View } from "react-native"
@@ -26,6 +27,7 @@ export default function Screen() {
     const [passwordRequired, setPasswordRequired] = React.useState(false)
     const [isSubmitting, setIsSubmitting] = React.useState(false)
     const setServerUrl = useSetServerUrl()
+    const queryClient = useQueryClient()
 
     // React.useEffect(() => {
     //     if (!inputValue && currentServerUrl) {
@@ -74,6 +76,7 @@ export default function Screen() {
                 })
 
                 await setServerStatus(null)
+                queryClient.removeQueries({ queryKey: [API_ENDPOINTS.STATUS.GetStatus.key] })
                 await setServerAuthToken(hashedPassword)
                 await setServerUrl(sanitizedUrl)
 
@@ -109,7 +112,7 @@ export default function Screen() {
                 setIsSubmitting(false)
             }
         })()
-    }, [inputValue, passwordValue, setServerAuthToken, setServerStatus, setServerUrl, showErrorToast])
+    }, [inputValue, passwordValue, queryClient, setServerAuthToken, setServerStatus, setServerUrl, showErrorToast])
 
     if (Platform.isTV) {
         return (
