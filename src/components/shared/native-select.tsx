@@ -2,9 +2,10 @@ import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Ionicons } from "@expo/vector-icons"
+import { MenuView } from "@react-native-menu/menu"
+import { ExpoNativeMenuView } from "expo-native-menu"
 import * as React from "react"
-import { Platform, Pressable, Text, View } from "react-native"
-import * as DropdownMenu from "zeego/dropdown-menu"
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native"
 
 export type NativeSelectOption = {
     id: string
@@ -83,44 +84,56 @@ export function NativeSelect({
         )
     }
 
-    return (
-        <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-                <Pressable
-                    disabled={disabled}
-                    className={cn(
-                        "flex-row items-center justify-between h-11 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] active:bg-white/5",
-                        disabled && "opacity-50",
-                        className,
-                    )}
-                >
-                    <Text
-                        className={cn(
-                            "text-sm font-medium flex-1",
-                            selectedLabel ? "text-white" : "text-muted-foreground",
-                        )}
-                        numberOfLines={1}
-                    >
-                        {selectedLabel ?? placeholder}
-                    </Text>
-                    <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.45)" />
-                </Pressable>
-            </DropdownMenu.Trigger>
+    const triggerClassName = cn(
+        "flex-row items-center justify-between h-11 px-3.5 rounded-xl border border-white/10 bg-white/[0.04] active:bg-white/5",
+        disabled && "opacity-50",
+        className,
+    )
+    const triggerContent = (
+        <>
+            <Text
+                className={cn(
+                    "text-sm font-medium flex-1",
+                    selectedLabel ? "text-white" : "text-muted-foreground",
+                )}
+                numberOfLines={1}
+            >
+                {selectedLabel ?? placeholder}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.45)" />
+        </>
+    )
 
-            <DropdownMenu.Content>
-                {options.map(option => (
-                    <DropdownMenu.CheckboxItem
-                        key={option.id}
-                        value={option.id === selectedId ? "on" : "off"}
-                        onValueChange={() => onSelect(option.id)}
-                    >
-                        <DropdownMenu.ItemTitle>{option.label}</DropdownMenu.ItemTitle>
-                        {!!option.sublabel && (
-                            <DropdownMenu.ItemSubtitle>{option.sublabel}</DropdownMenu.ItemSubtitle>
-                        )}
-                    </DropdownMenu.CheckboxItem>
-                ))}
-            </DropdownMenu.Content>
-        </DropdownMenu.Root>
+    if (Platform.OS === "ios") {
+        return (
+            <View className={triggerClassName}>
+                {triggerContent}
+                <ExpoNativeMenuView
+                    style={StyleSheet.absoluteFill}
+                    options={options}
+                    selectedId={selectedId}
+                    label={selectedLabel ?? placeholder}
+                    disabled={disabled}
+                    onSelectOption={event => onSelect(event.nativeEvent.id)}
+                />
+            </View>
+        )
+    }
+
+    return (
+        <MenuView
+            shouldOpenOnLongPress={false}
+            actions={options.map(option => ({
+                id: option.id,
+                title: option.label,
+                subtitle: option.sublabel,
+                state: option.id === selectedId ? "on" : "off",
+            }))}
+            onPressAction={event => onSelect(event.nativeEvent.event)}
+        >
+            <Pressable disabled={disabled} className={triggerClassName}>
+                {triggerContent}
+            </Pressable>
+        </MenuView>
     )
 }

@@ -165,15 +165,15 @@ export default function MangaLibraryScreen() {
                                         isFocused={isFocused}
                                         scrollY={scrollY}
                                     />
-                                ) : null
+                                ) : undefined
                             }
-                            ListFooterComponent={Platform.isTV ? null : <DownloadedMangaList />}
+                            ListFooterComponent={Platform.isTV ? undefined : <DownloadedMangaList />}
                             ListEmptyComponent={isConnected && currentlyReadingEntries.length === 0 ? (
                                 <LuffyError
                                     title="Your manga library is empty"
                                     description="Add manga to your collection or use the Discover tab to find something to read."
                                 />
-                            ) : null}
+                            ) : undefined}
                             contentInsetAdjustmentBehavior="never"
                             contentContainerStyle={{
                                 paddingTop: hasHero ? 0 : searchHeaderHeight,

@@ -1,4 +1,5 @@
 import { getClientIdentity } from "@/api/client/client-identity"
+import { tvKeyAction } from "@/components/tv/tv-native"
 import type { Anime_Episode, Onlinestream_VideoSource } from "@/api/generated/types"
 import { useGetContinuityWatchHistory } from "@/api/hooks/continuity.hooks"
 import {
@@ -60,7 +61,7 @@ import { MpvPlayerView, type TechnicalInfo } from "expo-mpv-player"
 import { NavigationBar } from "expo-navigation-bar"
 import { useRouter } from "expo-router"
 import { useAtom, useAtomValue } from "jotai/react"
-import { SkipForward } from "lucide-react-native"
+import SkipForward from "lucide-react-native/icons/skip-forward"
 import React from "react"
 import {
     ActivityIndicator,
@@ -750,19 +751,19 @@ function PlayerScreenInner() {
         }
 
         if (event.eventType === "longLeft") {
-            if (event.eventKeyAction === 0) tvLongSeek.start(-1)
-            if (event.eventKeyAction === 1) tvLongSeek.stop()
+            if (tvKeyAction(event) === 0) tvLongSeek.start(-1)
+            if (tvKeyAction(event) === 1) tvLongSeek.stop()
             return
         }
         if (event.eventType === "longRight") {
-            if (event.eventKeyAction === 0) tvLongSeek.start(1)
-            if (event.eventKeyAction === 1) tvLongSeek.stop()
+            if (tvKeyAction(event) === 0) tvLongSeek.start(1)
+            if (tvKeyAction(event) === 1) tvLongSeek.stop()
             return
         }
 
         if (panel || nextEpisodePrompt || showExitPrompt) return
 
-        if (event.eventKeyAction === 0) return
+        if (tvKeyAction(event) === 0) return
 
         if (!controls.controlsVisible) {
             if (event.eventType === "left") {

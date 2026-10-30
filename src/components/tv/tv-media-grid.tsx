@@ -111,7 +111,7 @@ export function TVMediaGrid({
                         Loading more…
                     </Text>
                 </View>
-            ) : null}
+            ) : undefined}
         />
     )
 }

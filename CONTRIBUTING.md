@@ -10,7 +10,7 @@ Contributions to Seanime Tenji are welcome. This guide outlines how to set up th
 
 To build and run Seanime Tenji, ensure your machine has the following tools installed:
 
-* **Node.js** (v18 or higher recommended)
+* **Node.js** 22.13 or newer, or 24.3 or newer (required by Expo SDK 58)
 * **npm** (for dependency management)
 * **JDK** (for compiling Android native binaries)
 * **Android Studio & Android SDK** (for Android emulator testing)

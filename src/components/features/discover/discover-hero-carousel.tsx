@@ -6,7 +6,8 @@ import { COLORS } from "@/constants/colors"
 import { LinearGradient } from "expo-linear-gradient"
 import { router } from "expo-router"
 import React from "react"
-import { InteractionManager, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native"
+import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, type ScrollViewInstance, Text, useWindowDimensions, View } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 import Animated, {
     Extrapolation,
     interpolate,
@@ -55,7 +56,7 @@ type DiscoverHeroItem = AL_BaseAnime | AL_BaseManga
 export type DiscoverHeroCarouselController = {
     currentIndex: number
     screenWidth: number
-    scrollRef: React.RefObject<ScrollView | null>
+    scrollRef: React.RefObject<ScrollViewInstance | null>
     scrollX: SharedValue<number>
     handleDotPress: (index: number) => void
     handleScrollBeginDrag: () => void
@@ -86,7 +87,7 @@ export function useDiscoverHeroItems(media: DiscoverHeroItem[]) {
 export function useDiscoverHeroCarouselController(media: DiscoverHeroItem[], isActive: boolean): DiscoverHeroCarouselController {
     const { width: screenWidth } = useWindowDimensions()
     const [currentIndex, setCurrentIndex] = React.useState(0)
-    const scrollRef = React.useRef<ScrollView | null>(null)
+    const scrollRef = React.useRef<ScrollViewInstance | null>(null)
     const scrollX = useSharedValue(0)
     const isInteracting = React.useRef(false)
     const mediaKey = React.useMemo(() => media.map(item => String(item.id)).join(":"), [media])
@@ -184,7 +185,7 @@ export function DiscoverHeroCarouselBackdrop({ media, currentIndex, screenWidth,
         setShouldRenderHeroImages(false)
 
         let timeoutId: ReturnType<typeof setTimeout> | undefined
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             timeoutId = setTimeout(() => {
                 setShouldRenderHeroImages(true)
             }, HERO_IMAGE_MOUNT_DELAY_MS)

@@ -23,7 +23,8 @@ import { useIsFocused } from "expo-router"
 import { useAtom } from "jotai"
 import * as React from "react"
 import { useEffect, useMemo, useState } from "react"
-import { InteractionManager, Platform, RefreshControl, View } from "react-native"
+import { Platform, RefreshControl, View } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 import Animated, { FadeIn, useSharedValue } from "react-native-reanimated"
 import { TVAnimeEntryScreen } from "@/components/tv/tv-anime-entry-screen"
 
@@ -133,7 +134,7 @@ export function AnimeEntryScreen({ initialView }: AnimeEntryScreenProps) {
     useEffect(() => {
         setIsPrimaryBodyReady(false)
 
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             setIsPrimaryBodyReady(true)
         })
 
@@ -247,7 +248,7 @@ export function AnimeEntryScreen({ initialView }: AnimeEntryScreenProps) {
     const refreshControl = isConnected ? (
         <RefreshControl
             refreshing={isFetching}
-            onRefresh={refetch}
+            onRefresh={() => void refetch()}
             tintColor="rgba(255,255,255,0.45)"
         />
     ) : undefined

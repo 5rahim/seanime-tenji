@@ -7,7 +7,8 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { LinearGradient } from "expo-linear-gradient"
 import { router } from "expo-router"
 import * as React from "react"
-import { InteractionManager, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native"
+import { Platform, Pressable, ScrollView, type ScrollViewInstance, Text, useWindowDimensions, View } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 import Animated, {
     Extrapolation,
     interpolate,
@@ -116,7 +117,7 @@ export function LibraryHeroCarousel({
     }, [type, animeItems, mangaItems])
 
     const [currentIndex, setCurrentIndex] = React.useState(0)
-    const scrollRef = React.useRef<ScrollView | null>(null)
+    const scrollRef = React.useRef<ScrollViewInstance | null>(null)
     const scrollX = useSharedValue(0)
     const isInteracting = React.useRef(false)
 
@@ -419,7 +420,7 @@ function LibraryHeroBackdrop({
 
         setShouldRenderImages(false)
         let timeoutId: ReturnType<typeof setTimeout> | undefined
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             timeoutId = setTimeout(() => {
                 setShouldRenderImages(true)
             }, HERO_IMAGE_MOUNT_DELAY_MS)

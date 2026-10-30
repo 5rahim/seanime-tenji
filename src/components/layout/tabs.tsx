@@ -22,7 +22,7 @@ export type AppTabConfig = {
 const BAR_MARGIN = 30
 const BAR_MAX_WIDTH = 560
 
-export function TabBar({ state, descriptors, navigation, tabs, user }: BottomTabBarProps & {
+export function TabBar({ state, descriptors, emitter, navigateToTab, tabs, user }: BottomTabBarProps & {
     tabs: AppTabConfig[],
     user: Status["user"] | undefined
 }) {
@@ -51,19 +51,19 @@ export function TabBar({ state, descriptors, navigation, tabs, user }: BottomTab
                 const isFocused = state.index === index
 
                 const onPress = () => {
-                    const event = navigation.emit({
+                    const event = emitter.emit({
                         type: "tabPress",
                         target: route.key,
                         canPreventDefault: true,
                     })
 
                     if (!isFocused && !event.defaultPrevented) {
-                        navigation.navigate(route.name, route.params)
+                        navigateToTab(route.key)
                     }
                 }
 
                 const onLongPress = () => {
-                    navigation.emit({
+                    emitter.emit({
                         type: "tabLongPress",
                         target: route.key,
                     })

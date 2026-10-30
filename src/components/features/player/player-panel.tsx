@@ -14,34 +14,32 @@ import {
 } from "@/lib/player/subtitle-search"
 import { cn } from "@/lib/utils"
 import type { MpvVideoOutput } from "expo-mpv-player"
-import {
-    Activity,
-    Captions,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    Clapperboard,
-    Cpu,
-    Download,
-    Gauge,
-    Globe,
-    Languages,
-    List,
-    Lock,
-    Mic2,
-    Minus,
-    Pause,
-    PictureInPicture2,
-    Play,
-    Plus,
-    RotateCw,
-    Search,
-    SkipForward,
-    Sun,
-    Timer,
-    Type,
-    X,
-} from "lucide-react-native"
+import Activity from "lucide-react-native/icons/activity"
+import Captions from "lucide-react-native/icons/captions"
+import Check from "lucide-react-native/icons/check"
+import ChevronLeft from "lucide-react-native/icons/chevron-left"
+import ChevronRight from "lucide-react-native/icons/chevron-right"
+import Clapperboard from "lucide-react-native/icons/clapperboard"
+import Cpu from "lucide-react-native/icons/cpu"
+import Download from "lucide-react-native/icons/download"
+import Gauge from "lucide-react-native/icons/gauge"
+import Globe from "lucide-react-native/icons/globe"
+import Languages from "lucide-react-native/icons/languages"
+import List from "lucide-react-native/icons/list"
+import Lock from "lucide-react-native/icons/lock"
+import Mic2 from "lucide-react-native/icons/mic-vocal"
+import Minus from "lucide-react-native/icons/minus"
+import Pause from "lucide-react-native/icons/pause"
+import PictureInPicture2 from "lucide-react-native/icons/picture-in-picture-2"
+import Play from "lucide-react-native/icons/play"
+import Plus from "lucide-react-native/icons/plus"
+import RotateCw from "lucide-react-native/icons/rotate-cw"
+import Search from "lucide-react-native/icons/search"
+import SkipForward from "lucide-react-native/icons/skip-forward"
+import Sun from "lucide-react-native/icons/sun"
+import Timer from "lucide-react-native/icons/timer"
+import Type from "lucide-react-native/icons/type"
+import X from "lucide-react-native/icons/x"
 import React from "react"
 import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from "react-native"
 import { Pressable } from "react-native-gesture-handler"

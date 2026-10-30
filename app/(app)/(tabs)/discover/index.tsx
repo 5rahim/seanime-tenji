@@ -36,7 +36,7 @@ import Ionicons from "@expo/vector-icons/Ionicons"
 import { useIsFocused } from "expo-router"
 import { router } from "expo-router"
 import * as React from "react"
-import { ActivityIndicator, Platform, Pressable, Text, useWindowDimensions, View, ViewToken } from "react-native"
+import { ActivityIndicator, Platform, Pressable, Text, type ListViewToken, useWindowDimensions, View } from "react-native"
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated"
 
 type DiscoverMode = "anime" | "manga"
@@ -256,7 +256,7 @@ function useDiscoverSectionActivation(sectionCount: number) {
         setHighestActivatedIndex(Math.min(sectionCount - 1, 1))
     }, [sectionCount])
 
-    const onViewableItemsChanged = React.useRef(({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+    const onViewableItemsChanged = React.useRef(({ viewableItems }: { viewableItems: Array<ListViewToken> }) => {
         let highestVisibleIndex = -1
 
         for (const item of viewableItems) {

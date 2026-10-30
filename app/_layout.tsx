@@ -101,7 +101,7 @@ export default function RootLayout() {
     useConnectionStateMonitor()
 
     React.useEffect(() => {
-        if (!Platform.isTVOS) return
+        if (Platform.OS !== "ios" || !Platform.isTV) return
 
         const trace = __DEV__
             ? ExpoTVFocus.addTraceListener(({ message }) => {

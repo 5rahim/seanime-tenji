@@ -16,21 +16,19 @@ import { tvSize } from "@/components/tv/tv-scale"
 import type { PlayerPreferences } from "@/lib/player/player-preferences"
 import type { PlayerState, PlayerTrack } from "@/lib/player/types"
 import type { MpvVideoOutput } from "expo-mpv-player"
-import {
-    Activity,
-    Captions,
-    Check,
-    ChevronLeft,
-    Clapperboard,
-    Cpu,
-    Gauge,
-    List,
-    Mic2,
-    RotateCw,
-    SkipForward,
-    Timer,
-    Type,
-} from "lucide-react-native"
+import Activity from "lucide-react-native/icons/activity"
+import Captions from "lucide-react-native/icons/captions"
+import Check from "lucide-react-native/icons/check"
+import ChevronLeft from "lucide-react-native/icons/chevron-left"
+import Clapperboard from "lucide-react-native/icons/clapperboard"
+import Cpu from "lucide-react-native/icons/cpu"
+import Gauge from "lucide-react-native/icons/gauge"
+import List from "lucide-react-native/icons/list"
+import Mic2 from "lucide-react-native/icons/mic-vocal"
+import RotateCw from "lucide-react-native/icons/rotate-cw"
+import SkipForward from "lucide-react-native/icons/skip-forward"
+import Timer from "lucide-react-native/icons/timer"
+import Type from "lucide-react-native/icons/type"
 import * as React from "react"
 import { Animated, FlatList, Platform, Pressable, ScrollView, Text, TVFocusGuideView, View } from "react-native"
 

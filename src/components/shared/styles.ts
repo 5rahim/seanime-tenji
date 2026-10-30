@@ -10,7 +10,7 @@ export const Styles = {
 } satisfies Record<string, any>
 
 export const StackScreen_MainStyle: NativeStackNavigationOptions = {
-    headerLargeTitle: true,
+    headerLargeTitleEnabled: true,
     headerLargeTitleStyle: {
         color: COLORS.text,
         fontSize: 32,

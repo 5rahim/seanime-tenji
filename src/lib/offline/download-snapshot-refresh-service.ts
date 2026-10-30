@@ -44,7 +44,7 @@ export function useDownloadSnapshotRefreshService() {
     const serverUrl = useServerUrl()
     const connectionState = useServerConnectionState()
     const queryClient = useQueryClient()
-    const appStateRef = useRef<AppStateStatus>(AppState.currentState)
+    const appStateRef = useRef(AppState.currentState as AppStateStatus)
     const refreshInFlightRef = useRef(false)
     const lastRefreshAtRef = useRef(0)
 

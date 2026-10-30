@@ -33,16 +33,15 @@ export default function AppLayout() {
             {!Platform.isTV && <BackgroundServices />}
             <PlayerEventMount />
             <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false, freezeOnBlur: true }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                 <Stack.Screen
                     name="entry"
                     options={{
                         headerShown: false,
                         animation: "slide_from_right",
-                        freezeOnBlur: true,
                     }}
                 />
-                <Stack.Screen name="(media)" options={{ headerShown: false, freezeOnBlur: true }} />
+                <Stack.Screen name="(media)" options={{ headerShown: false }} />
             </Stack>
         </ServerDataWrapper>
     )

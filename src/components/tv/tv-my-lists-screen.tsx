@@ -1,3 +1,4 @@
+import { requestTVFocus } from "@/components/tv/tv-native"
 import type {
     AL_AnimeCollection_MediaListCollection_Lists,
     AL_BaseAnime,
@@ -129,7 +130,7 @@ function getChoices(lists: AL_AnimeCollection_MediaListCollection_Lists[]): List
 
 function returnFocus(ref: React.RefObject<ButtonRef | null>) {
     requestAnimationFrame(() => {
-        requestAnimationFrame(() => ref.current?.requestTVFocus())
+        requestAnimationFrame(() => requestTVFocus(ref.current))
     })
 }
 

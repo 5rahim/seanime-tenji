@@ -220,7 +220,7 @@ function MobileLibraryScreen() {
                                     title="Your anime library is empty"
                                     description="Add anime to your collection or use the Discover tab to find something to watch."
                                 />
-                            ) : null}
+                            ) : undefined}
                             contentInsetAdjustmentBehavior="never"
                             contentContainerStyle={{
                                 paddingTop: hasHero ? 0 : searchHeaderHeight,

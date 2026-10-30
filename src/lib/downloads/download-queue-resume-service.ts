@@ -14,7 +14,7 @@ const RESUME_MIN_GAP_MS = 5_000
 export function useDownloadQueueResumeService() {
     const serverUrl = useServerUrl()
     const connectionState = useServerConnectionState()
-    const appStateRef = useRef<AppStateStatus>(AppState.currentState)
+    const appStateRef = useRef(AppState.currentState as AppStateStatus)
     const resumeInFlightRef = useRef(false)
     const lastResumeAtRef = useRef(0)
 

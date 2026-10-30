@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import { type BottomSheetScrollViewMethods, BottomSheetTextInput } from "@gorhom/bottom-sheet"
 import * as React from "react"
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native"
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, type TextInputInstance, View } from "react-native"
 
 const styles = StyleSheet.create({
     tagSearchInput: {
@@ -63,7 +63,7 @@ export function SearchFilterSheet({
     const [keyboardGap, setKeyboardGap] = React.useState(0)
     const tagCatalog = mediaTags as MediaTag[]
     const scrollRef = React.useRef<BottomSheetScrollViewMethods>(null)
-    const tagInputRef = React.useRef<React.ElementRef<typeof BottomSheetTextInput>>(null)
+    const tagInputRef = React.useRef<TextInputInstance>(null)
     const contentY = React.useRef(0)
     const tagsY = React.useRef(0)
     const tagFocused = React.useRef(false)
@@ -321,7 +321,7 @@ export function SearchFilterSheet({
                             <View className="h-11 flex-row items-center rounded-2xl border border-white/10 bg-white/[0.04] px-3">
                                 <Ionicons name="search-outline" size={17} color="rgba(255,255,255,0.4)" />
                                 <BottomSheetTextInput
-                                    ref={tagInputRef}
+                                    ref={tagInputRef as unknown as React.Ref<React.ComponentRef<typeof BottomSheetTextInput>>}
                                     defaultValue=""
                                     onChangeText={setTagSearch}
                                     placeholder="Find a tag"

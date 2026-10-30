@@ -3,8 +3,6 @@
  *
  * Xcode 27 fails the build when a target is set below iOS 15, which a few pods
  * (RNSVG, ReachabilitySwift, Mute) still do on their resource bundle targets.
- * Its SDK also moved some APIs to iOS 16, which breaks pods that guard them
- * with an older version (react-native-ios-context-menu).
  */
 const { withDangerousMod } = require("expo/config-plugins")
 const fs = require("fs")

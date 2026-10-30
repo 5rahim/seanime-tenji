@@ -1,4 +1,5 @@
 import { usePreferredFocus, useTVFocus } from "@/components/tv/tv-focus"
+import { requestTVFocus } from "@/components/tv/tv-native"
 import { tvSize } from "@/components/tv/tv-scale"
 import * as React from "react"
 import {
@@ -7,6 +8,7 @@ import {
     Pressable,
     Text,
     TextInput,
+    type TextInputInstance,
     type TextInputProps,
     View,
     type ViewStyle,
@@ -31,7 +33,7 @@ export const TVInput = React.forwardRef<TVInputHandle, TVInputProps>(
         const focusState = useTVFocus(1.02, props.placeholder || "TextInput")
         const isPreferred = usePreferredFocus(preferred)
         const [editing, setEditing] = React.useState(false)
-        const inputRef = React.useRef<TextInput>(null)
+        const inputRef = React.useRef<TextInputInstance>(null)
         const fieldRef = React.useRef<React.ElementRef<typeof Pressable>>(null)
         const focusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -43,7 +45,7 @@ export const TVInput = React.forwardRef<TVInputHandle, TVInputProps>(
         const returnFocus = React.useCallback(() => {
             if (focusTimerRef.current) clearTimeout(focusTimerRef.current)
             focusTimerRef.current = setTimeout(() => {
-                fieldRef.current?.requestTVFocus()
+                requestTVFocus(fieldRef.current)
             }, 80)
         }, [])
 
@@ -51,7 +53,7 @@ export const TVInput = React.forwardRef<TVInputHandle, TVInputProps>(
             focus: edit,
             blur: () => inputRef.current?.blur(),
             isFocused: () => inputRef.current?.isFocused() ?? false,
-            requestTVFocus: () => fieldRef.current?.requestTVFocus(),
+            requestTVFocus: () => requestTVFocus(fieldRef.current),
         }), [edit])
 
         React.useEffect(() => {

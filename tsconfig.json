@@ -27,6 +27,9 @@
       ],
       "expo-tv-focus": [
         "./modules/expo-tv-focus/src/index"
+      ],
+      "expo-native-menu": [
+        "./modules/expo-native-menu/src/index"
       ]
     }
   },

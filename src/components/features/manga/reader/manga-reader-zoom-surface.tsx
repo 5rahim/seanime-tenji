@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, StyleProp, View, ViewStyle } from "react-native"
+import { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, type ScrollViewInstance, StyleProp, View, ViewStyle } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated"
 
@@ -56,7 +56,7 @@ type MangaReaderZoomSurfaceProps = {
     tapViewportHeight?: number
     tapExclusionTop?: number
     tapExclusionBottom?: number
-    scrollViewRef?: React.RefObject<ScrollView | null>
+    scrollViewRef?: React.RefObject<ScrollViewInstance | null>
 }
 
 export function MangaReaderZoomSurface({
@@ -82,7 +82,7 @@ export function MangaReaderZoomSurface({
     const isCustomPinch = pinchEnabled && Platform.OS !== "ios" && !disabled
     const hasScrollableContainer = Boolean(onScroll || scrollViewRef)
     const hasTapHandler = Boolean(onTap)
-    const nativeScrollRef = React.useRef<ScrollView | null>(null)
+    const nativeScrollRef = React.useRef<ScrollViewInstance | null>(null)
     const nativeZoomScaleRef = React.useRef(1)
     const nativeScrollMetricsRef = React.useRef({
         offsetX: 0,
@@ -139,7 +139,7 @@ export function MangaReaderZoomSurface({
         tapViewportHeightValue,
     ])
 
-    const setScrollViewNode = React.useCallback((node: ScrollView | null) => {
+    const setScrollViewNode = React.useCallback((node: ScrollViewInstance | null) => {
         nativeScrollRef.current = node
 
         if (scrollViewRef) {

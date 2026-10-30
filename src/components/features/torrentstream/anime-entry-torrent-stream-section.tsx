@@ -1,4 +1,5 @@
 import { Anime_Entry } from "@/api/generated/types"
+import { requestTVFocus } from "@/components/tv/tv-native"
 import { animeEntryPlaybackIntentAtom } from "@/atoms/anime-entry.atoms"
 import { CenteredSpinner } from "@/components/shared/centered-spinner"
 import { LuffyError } from "@/components/shared/luffy-error"
@@ -60,7 +61,7 @@ export function AnimeEntryTorrentStreamSection({ entry }: AnimeEntryTorrentStrea
         let innerFrame = 0
         const outerFrame = requestAnimationFrame(() => {
             innerFrame = requestAnimationFrame(() => {
-                playRef.current?.requestTVFocus()
+                requestTVFocus(playRef.current)
             })
         })
 

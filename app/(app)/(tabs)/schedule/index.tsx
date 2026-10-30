@@ -370,7 +370,7 @@ function ScheduleGrid({
                     <ScheduleCardWrapper item={item} settings={settings} cardWidth={cardWidth} />
                 )}
                 ListHeaderComponent={header}
-                ListFooterComponent={footer}
+                ListFooterComponent={footer ?? undefined}
                 ListEmptyComponent={(
                     <View className="items-center justify-center px-8 py-14">
                         <Ionicons name="calendar-outline" size={40} color="rgba(255,255,255,0.15)" />

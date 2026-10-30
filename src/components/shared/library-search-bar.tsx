@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 import Ionicons from "@expo/vector-icons/Ionicons"
 import * as React from "react"
-import { Pressable, TextInput, View } from "react-native"
+import { Pressable, TextInput, type TextInputInstance, View } from "react-native"
 import Animated, { FadeIn, FadeOut, interpolateColor, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated"
 
 export type LibrarySearchBarProps = {
@@ -19,7 +19,7 @@ export function LibrarySearchBar({
     className,
     autoFocus,
 }: LibrarySearchBarProps) {
-    const inputRef = React.useRef<TextInput>(null)
+    const inputRef = React.useRef<TextInputInstance>(null)
     const focused = useSharedValue(0)
 
     function handleFocus() {

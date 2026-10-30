@@ -22,7 +22,8 @@ import { useIsFocused } from "expo-router"
 import { router, useLocalSearchParams } from "expo-router"
 import * as React from "react"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { InteractionManager, Platform, RefreshControl, Text, TouchableOpacity, View } from "react-native"
+import { Platform, RefreshControl, Text, TouchableOpacity, View } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 import Animated, { FadeIn, useSharedValue } from "react-native-reanimated"
 import Reanimated, { useAnimatedScrollHandler } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -104,7 +105,7 @@ export function MangaEntryScreen({ initialView = "chapters" }: MangaEntryScreenP
     useEffect(() => {
         setIsPrimaryBodyReady(false)
 
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             setIsPrimaryBodyReady(true)
         })
 

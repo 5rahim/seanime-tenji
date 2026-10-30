@@ -111,7 +111,7 @@ type SaveEpisodeDownloadRecordOptions = {
 
 const activeDownloads = new Map<string, ActiveDownload>()
 const queuedDownloads: QueuedAnimeDownload[] = []
-let currentAppState: AppStateStatus = AppState.currentState
+let currentAppState = AppState.currentState as AppStateStatus
 
 function dlKey(mediaId: number, episodeId: string): string {
     return `${mediaId}:${episodeId}`

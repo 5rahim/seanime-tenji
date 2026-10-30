@@ -1,6 +1,6 @@
 import { logger } from "@/lib/utils/logger"
 import * as React from "react"
-import { InteractionManager } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 
 const log = logger("screen-profiler")
 
@@ -23,7 +23,7 @@ export function useDevScreenProfiler(label: string, primaryContentReady: boolean
         mountTimeRef.current = start
         didLogReadyRef.current = false
 
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             log.info(`${label} interactions settled in ${Math.round(getNow() - start)}ms`)
         })
 

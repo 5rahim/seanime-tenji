@@ -234,7 +234,7 @@ export function AnimeEntryLibraryView({
                 windowSize={9}
                 updateCellsBatchingPeriod={16}
                 onScroll={scrollHandler}
-                ListEmptyComponent={hasEpisodes ? null : (
+                ListEmptyComponent={hasEpisodes ? undefined : (
                     <View className="">
                         <LuffyError
                             title="No local files scanned"

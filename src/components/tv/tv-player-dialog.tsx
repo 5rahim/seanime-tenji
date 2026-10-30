@@ -1,4 +1,5 @@
 import { TVButton } from "@/components/tv/tv-focus"
+import { requestTVFocus } from "@/components/tv/tv-native"
 import { tvSize } from "@/components/tv/tv-scale"
 import * as React from "react"
 import { Pressable, Text, TVFocusGuideView, View } from "react-native"
@@ -32,7 +33,7 @@ export function TVPlayerDialog({
         let innerFrame = 0
         const outerFrame = requestAnimationFrame(() => {
             innerFrame = requestAnimationFrame(() => {
-                cancelRef.current?.requestTVFocus()
+                requestTVFocus(cancelRef.current)
             })
         })
 

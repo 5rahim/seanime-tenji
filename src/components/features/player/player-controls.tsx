@@ -1,11 +1,17 @@
 import type { PlayerChapter, PlayerState as PlayerStateType } from "@/lib/player"
 import type { MobilePlaybackSource } from "@/lib/player/types"
 import { cn } from "@/lib/utils"
-import { ChevronLeft, List, Pause, Play, Settings, SkipForward, Unlock } from "lucide-react-native"
+import ChevronLeft from "lucide-react-native/icons/chevron-left"
+import List from "lucide-react-native/icons/list"
+import Pause from "lucide-react-native/icons/pause"
+import Play from "lucide-react-native/icons/play"
+import Settings from "lucide-react-native/icons/settings"
+import SkipForward from "lucide-react-native/icons/skip-forward"
+import Unlock from "lucide-react-native/icons/lock-open"
 import React from "react"
 import { Platform, Pressable as RNPressable, Text, View, type ViewStyle } from "react-native"
 import { GestureDetector, Pressable as GHPressable } from "react-native-gesture-handler"
-import type { ComposedGesture, GestureType } from "react-native-gesture-handler"
+import type { GestureType, LegacyComposedGesture } from "react-native-gesture-handler"
 import Animated, { type AnimatedStyle, FadeIn, FadeOut, type SharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated"
 import { BUFFER_FILL } from "./constants"
 import { formatTime, isSkippableChapter } from "./helpers"
@@ -121,7 +127,7 @@ interface ControlsOverlayProps {
     insets: { top: number; bottom: number; left: number; right: number }
     zoomMode: "fit" | "fill"
     panel: PlayerPanel | null
-    seekBarGesture: GestureType | ComposedGesture
+    seekBarGesture: GestureType | LegacyComposedGesture
     onSeekBarLayout: (e: { nativeEvent: { layout: { width: number } } }) => void
     seekBarTrackStyle: AnimatedStyle<ViewStyle>
     seekBarFillStyle: AnimatedStyle<ViewStyle>

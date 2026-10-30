@@ -1,20 +1,19 @@
 import { BUFFER_FILL } from "@/components/features/player/constants"
+import { requestTVFocus, tvKeyAction } from "@/components/tv/tv-native"
 import { formatTime, isSkippableChapter } from "@/components/features/player/helpers"
 import { useTVFocus } from "@/components/tv/tv-focus"
 import { tvSize } from "@/components/tv/tv-scale"
 import type { PlayerChapter, PlayerState } from "@/lib/player"
 import type { MobilePlaybackSource } from "@/lib/player/types"
-import {
-    Captions,
-    List,
-    Pause,
-    Play,
-    RotateCcw,
-    RotateCw,
-    Settings,
-    SkipForward,
-    X,
-} from "lucide-react-native"
+import Captions from "lucide-react-native/icons/captions"
+import List from "lucide-react-native/icons/list"
+import Pause from "lucide-react-native/icons/pause"
+import Play from "lucide-react-native/icons/play"
+import RotateCcw from "lucide-react-native/icons/rotate-ccw"
+import RotateCw from "lucide-react-native/icons/rotate-cw"
+import Settings from "lucide-react-native/icons/settings"
+import SkipForward from "lucide-react-native/icons/skip-forward"
+import X from "lucide-react-native/icons/x"
 import * as React from "react"
 import {
     Animated,
@@ -231,7 +230,7 @@ export function TVPlayerControls({
 
     useTVEventHandler((event) => {
         if (!visible || !barFocused || !event) return
-        if (event.eventKeyAction === 0) return
+        if (tvKeyAction(event) === 0) return
 
         if (event.eventType === "left") {
             onSeekRelative(-seekSec)
@@ -267,7 +266,7 @@ export function TVPlayerControls({
 
             // This is the reliable focus API on react-native-tvos. Retry while
             // the native focus tree settles after the player panel closes.
-            target?.requestTVFocus()
+            requestTVFocus(target)
             tries++
             if (target && tries >= 5) returnRef.current = null
             if (tries < 5 && (visible || focusWhenHidden)) {

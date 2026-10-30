@@ -224,7 +224,7 @@ export function AnimeEntryServerLocalView({
                 windowSize={9}
                 updateCellsBatchingPeriod={16}
                 onScroll={scrollHandler}
-                ListEmptyComponent={hasEpisodes ? null : (
+                ListEmptyComponent={hasEpisodes ? undefined : (
                     <View className="py-12">
                         <LuffyError
                             title="No files found on server"

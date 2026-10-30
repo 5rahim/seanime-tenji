@@ -99,7 +99,7 @@ type ActiveMangaDownload = {
 const downloadQueue: QueueItem[] = []
 const activeDownloads = new Map<string, ActiveMangaDownload>()
 let serverUrl: string = ""
-let currentAppState: AppStateStatus = AppState.currentState
+let currentAppState = AppState.currentState as AppStateStatus
 
 function queueKey(mediaId: number, provider: string, chapterId: string): string {
     return `${mediaId}:${provider}:${chapterId}`

@@ -1,6 +1,7 @@
 import { MpvPlayerModule } from "expo-mpv-player"
 import React from "react"
-import { AppState, InteractionManager, Platform } from "react-native"
+import { AppState, Platform } from "react-native"
+import { runAfterInteractions } from "@/lib/run-after-interactions"
 
 type ScreenOrientationModule = typeof import("expo-screen-orientation")
 type Orientation = import("expo-screen-orientation").Orientation
@@ -105,7 +106,7 @@ export function useLandscapeOrientationLock({
             unlockNativeOrientation()
 
             requestAnimationFrame(() => {
-                InteractionManager.runAfterInteractions(() => {
+                runAfterInteractions(() => {
                     void ScreenOrientation.lockAsync(
                         restoreLock ?? ScreenOrientation.OrientationLock.PORTRAIT_UP,
                     )

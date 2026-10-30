@@ -1,3 +1,4 @@
+import { requestTVFocus } from "@/components/tv/tv-native"
 import type {
     Anime_Episode,
     AL_AnimeDetailsById_Media_Characters_Edges,
@@ -253,7 +254,7 @@ export function TVAnimeEntryScreen({
         const timer = setTimeout(() => {
             const episode = episodeRefs.current.get(`${savedView}:${returnFocus.episodeNumber}`)
             const target = episode ?? tabRef.current ?? playRef.current ?? editRef.current
-            target?.requestTVFocus()
+            requestTVFocus(target)
             setReturnFocus(null)
         }, 120)
 

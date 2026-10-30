@@ -1,4 +1,5 @@
 import { tvSize } from "@/components/tv/tv-scale"
+import { tvKeyAction } from "@/components/tv/tv-native"
 import { cn } from "@/lib/utils"
 import { useSegments } from "expo-router"
 import * as React from "react"
@@ -286,8 +287,8 @@ TVPillButton.displayName = "TVPillButton"
 export function useTVFocusLogger() {
     useTVEventHandler((event) => {
         if (!__DEV__ || !event) return
-        const { eventType, eventKeyAction, tag } = event
-        if (eventType !== "focus" && eventType !== "blur" && eventKeyAction === 1) {
+        const { eventType, tag } = event
+        if (eventType !== "focus" && eventType !== "blur" && tvKeyAction(event) === 1) {
             return
         }
         console.log(`[TVEvent] Action: ${eventType} (tag: ${tag})`)

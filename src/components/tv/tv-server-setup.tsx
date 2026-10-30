@@ -1,4 +1,5 @@
 import { TVButton } from "@/components/tv/tv-focus"
+import { requestTVFocus } from "@/components/tv/tv-native"
 import { tvSize } from "@/components/tv/tv-scale"
 import { IMAGES } from "@/constants/images"
 import Ionicons from "@expo/vector-icons/Ionicons"
@@ -56,7 +57,7 @@ function TVInput({
     const returnFocus = React.useCallback(() => {
         if (focusTimerRef.current) clearTimeout(focusTimerRef.current)
         focusTimerRef.current = setTimeout(() => {
-            fieldRef.current?.requestTVFocus()
+            requestTVFocus(fieldRef.current)
         }, 80)
     }, [])
 

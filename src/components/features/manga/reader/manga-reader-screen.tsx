@@ -50,6 +50,7 @@ import {
     Platform,
     Pressable,
     ScrollView,
+    type ScrollViewInstance,
     StatusBar,
     Text,
     useWindowDimensions,
@@ -152,7 +153,7 @@ export function MangaReaderScreen({ mediaId, provider, chapterId, chapterNumber 
 
     const horizontalListRef = React.useRef<FlashListRef<number[]> | null>(null)
     const verticalListRef = React.useRef<FlashListRef<number[]> | null>(null)
-    const longStripScrollRef = React.useRef<ScrollView | null>(null)
+    const longStripScrollRef = React.useRef<ScrollViewInstance | null>(null)
     const currentPageIndexRef = React.useRef(0)
     const restoringPositionRef = React.useRef(false)
     const didRestoreInitialPageRef = React.useRef(false)
