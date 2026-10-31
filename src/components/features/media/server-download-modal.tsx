@@ -3,6 +3,7 @@ import { useDebridAddTorrents } from "@/api/hooks/debrid.hooks"
 import { useTorrentClientDownload } from "@/api/hooks/torrent_client.hooks"
 import { useServerStatus } from "@/atoms/server.atoms"
 import { TorrentStreamPickerSheet } from "@/components/features/torrentstream/torrent-stream-picker-sheet"
+import { canDownloadMissingEpisodes } from "@/components/features/torrentstream/torrent-stream-picker-utils"
 import { useTorrentStreamController } from "@/components/features/torrentstream/use-torrent-stream-controller"
 import { SeaImage } from "@/components/shared/sea-image"
 import { SeaBottomSheet } from "@/components/ui/bottom-sheet"
@@ -140,35 +141,26 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
             const selectedFile = torrentStream.filePreviews.find(f => getFileSelectionValue(f) === selectedFileId)
             if (!selectedFile) return
 
-            if (torrentStream.streamMode === "debrid") {
-                debridAddTorrents({
-                    torrents: [torrent],
-                    destination: dest,
-                    media: entry.media,
-                })
-            } else {
-                const selectedIndex = selectedFile.index
-                const deselectIndices = torrentStream.filePreviews
-                    .map(f => f.index)
-                    .filter(idx => idx !== selectedIndex)
+            const selectedIndex = selectedFile.index
+            const deselectIndices = torrentStream.filePreviews
+                .map(f => f.index)
+                .filter(idx => idx !== selectedIndex)
 
-                downloadTorrent({
-                    torrents: [torrent],
-                    destination: dest,
-                    smartSelect: {
-                        enabled: false,
-                        missingEpisodeNumbers: [],
-                    },
-                    deselect: {
-                        enabled: true,
-                        indices: deselectIndices,
-                    },
-                    media: entry.media,
-                })
-            }
+            downloadTorrent({
+                torrents: [torrent],
+                destination: dest,
+                smartSelect: {
+                    enabled: false,
+                    missingEpisodeNumbers: [],
+                },
+                deselect: {
+                    enabled: deselectIndices.length > 0,
+                    indices: deselectIndices,
+                },
+                media: entry.media,
+            })
         },
-        [debridAddTorrents, downloadTorrent, entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os, torrentStream.filePreviews,
-            torrentStream.streamMode, destination])
+        [downloadTorrent, entry, serverStatus?.settings?.library?.libraryPath, serverStatus?.os, torrentStream.filePreviews, destination])
 
     const episodes = useMemo(() => {
         const presentEpisodeKeys = new Set(
@@ -278,6 +270,8 @@ export function ServerDownloadModal({ entry, open, onOpenChange }: ServerDownloa
                 onDownloadFile={handleDownloadFile}
                 isDownloading={isDownloading}
                 hasTorrentClient={hasTorrentClient}
+                canChooseFile={torrentStream.canChooseFile}
+                canDownloadMissing={torrentStream.streamMode === "torrent" && canDownloadMissingEpisodes(entry)}
                 batchHistory={torrentStream.batchHistory}
                 batchHistoryMetadata={torrentStream.batchHistory?.metadata}
                 bestRelease={torrentStream.bestRelease}

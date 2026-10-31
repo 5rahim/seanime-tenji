@@ -36,6 +36,7 @@ import * as React from "react"
 import {
     getFileSelectionValue,
     type StreamFilePreview,
+    torrentConfirmAction,
 } from "./torrent-stream-picker-utils"
 import { batchAction } from "./previous-batch"
 
@@ -113,6 +114,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
 
     const resolution = streamMode === "debrid" ? debridResolution : torrentResolution
     const autoSelect = streamMode === "debrid" ? debridAutoSelect : torrentAutoSelect
+    const canChooseFile = streamMode === "torrent" && hasTorrentStreaming
 
     const { data: episodeCollection, isLoading: isLoadingEpisodeCollection } = useGetAnimeEpisodeCollection(entry.mediaId)
     const { data: providerExtensions } = useAnimeListTorrentProviderExtensions()
@@ -703,7 +705,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         const sMode = streamMode
 
         if (mode === "download") {
-            if (usePreviousBatch && batchHistory?.torrent && episode.aniDBEpisode) {
+            if (canChooseFile && usePreviousBatch && batchHistory?.torrent && episode.aniDBEpisode) {
                 const previousBatchSelection = getPreviousBatchSelection(episode, sMode)
                 if (previousBatchSelection) {
                     setSelectedTorrent(previousBatchSelection.torrent)
@@ -751,8 +753,8 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
 
         openPickerForEpisode(episode, "torrents", sMode)
     },
-        [autoSelect, autoSelectFile, batchHistory?.torrent, episodeCollection?.hasMappingError, getPreviousBatchSelection, openPickerForEpisode,
-            startAutoSelectedStream, startManualStream, streamMode, usePreviousBatch, mode])
+        [autoSelect, autoSelectFile, batchHistory?.torrent, canChooseFile, episodeCollection?.hasMappingError, getPreviousBatchSelection,
+            openPickerForEpisode, startAutoSelectedStream, startManualStream, streamMode, usePreviousBatch, mode])
 
     const startPreviousBatchStream = React.useCallback((episode: Anime_Episode, mode: StreamMode = streamMode) => {
         if (!episode.aniDBEpisode) {
@@ -788,22 +790,26 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
     const handleConfirmTorrentSelection = React.useCallback(() => {
         if (!selectedEpisode) return
 
-        if (!selectedTorrent) {
+        const action = torrentConfirmAction(mode, selectedTorrent, autoSelectFile)
+
+        if (action === "auto-stream") {
             startAutoSelectedStream(selectedEpisode, streamMode)
             return
         }
 
-        if (selectedTorrent.isBatch && !autoSelectFile) {
+        if (action === "pick-file") {
             setSelectedFileId(null)
             setSheetStage("files")
             return
         }
 
-        startManualStream({
-            episode: selectedEpisode,
-            torrent: selectedTorrent,
-        }, streamMode)
-    }, [autoSelectFile, selectedEpisode, selectedTorrent, startAutoSelectedStream, startManualStream, streamMode])
+        if (action === "stream" && selectedTorrent) {
+            startManualStream({
+                episode: selectedEpisode,
+                torrent: selectedTorrent,
+            }, streamMode)
+        }
+    }, [autoSelectFile, mode, selectedEpisode, selectedTorrent, startAutoSelectedStream, startManualStream, streamMode])
 
     const handleConfirmFileSelection = React.useCallback(() => {
         if (!selectedEpisode || !selectedTorrent || !selectedFileId) return
@@ -877,6 +883,7 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
         autoSelect,
         autoSelectFile,
         batchHistory,
+        canChooseFile,
         closePicker,
         hasDebridService,
         hasTorrentStreaming,

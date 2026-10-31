@@ -76,6 +76,8 @@ type TorrentStreamPickerSheetProps = {
     onDownloadFile?: (torrent: HibikeTorrent_AnimeTorrent, fileId: string | null) => void
     isDownloading?: boolean
     hasTorrentClient?: boolean
+    canChooseFile?: boolean
+    canDownloadMissing?: boolean
     searchAcrossProviders: boolean
     onToggleSearchAcrossProviders: () => void
     extraProviderIds: string[]
@@ -138,6 +140,8 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         onDownloadFile,
         isDownloading = false,
         hasTorrentClient = false,
+        canChooseFile = false,
+        canDownloadMissing = false,
         searchAcrossProviders,
         onToggleSearchAcrossProviders,
         extraProviderIds,
@@ -162,8 +166,9 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
     const footer = React.useMemo(() => {
         if (mode === "download") {
             const hasDebrid = streamMode === "debrid"
-            const label = hasDebrid ? "Download with Debrid" : "Download to Server"
-            const showPrimary = selectedTorrent && (pickerStage === "torrents" ? !selectedTorrent.isBatch : selectedFileId !== null)
+            const isBatchSelected = pickerStage === "torrents" && !!selectedTorrent?.isBatch
+            const label = hasDebrid ? "Download with Debrid" : isBatchSelected ? "Download Batch" : "Download to Server"
+            const showPrimary = selectedTorrent && (pickerStage === "torrents" || selectedFileId !== null)
 
             return (
                 <SheetFooter className="flex-col gap-2">
@@ -183,24 +188,28 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                             </View>
                         </View>
                     )}
-                    {pickerStage === "torrents" && selectedTorrent?.isBatch && !hasDebrid && (
+                    {isBatchSelected && (canDownloadMissing || canChooseFile) && (
                         <View className="flex-row gap-3 w-full">
-                            <SheetFooterButton
-                                variant="cancel"
-                                onPress={() => onDownloadTorrent?.(selectedTorrent, true)}
-                                disabled={isDownloading}
-                                className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
-                            >
-                                <Text className="font-semibold text-indigo-400">Download Missing</Text>
-                            </SheetFooterButton>
-                            <SheetFooterButton
-                                variant="cancel"
-                                onPress={() => onDownloadTorrent?.(selectedTorrent, false)}
-                                disabled={isDownloading}
-                                className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
-                            >
-                                <Text className="font-semibold text-indigo-400">Download Full</Text>
-                            </SheetFooterButton>
+                            {canDownloadMissing && (
+                                <SheetFooterButton
+                                    variant="cancel"
+                                    onPress={() => onDownloadTorrent?.(selectedTorrent!, true)}
+                                    disabled={isDownloading}
+                                    className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
+                                >
+                                    <Text className="font-semibold text-indigo-400">Download Missing</Text>
+                                </SheetFooterButton>
+                            )}
+                            {canChooseFile && (
+                                <SheetFooterButton
+                                    variant="cancel"
+                                    onPress={onConfirmTorrentSelection}
+                                    disabled={isDownloading}
+                                    className="bg-indigo-500/10 border border-indigo-500/25 active:bg-indigo-500/20"
+                                >
+                                    <Text className="font-semibold text-indigo-400">Choose File</Text>
+                                </SheetFooterButton>
+                            )}
                         </View>
                     )}
                     <View className="flex-row gap-3 w-full">
@@ -211,32 +220,22 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
                         >
                             <Text className="font-medium text-foreground/70">Close</Text>
                         </SheetFooterButton>
-                        {pickerStage === "torrents" && selectedTorrent?.isBatch ? (
-                            <SheetFooterButton
-                                variant="primary"
-                                onPress={onConfirmTorrentSelection}
-                                disabled={isDownloading}
-                            >
-                                <Text className="font-semibold text-primary-foreground">Choose File</Text>
-                            </SheetFooterButton>
-                        ) : (
-                            <SheetFooterButton
-                                variant="primary"
-                                onPress={() => {
-                                    if (pickerStage === "files") {
-                                        onDownloadFile?.(selectedTorrent!, selectedFileId)
-                                    } else {
-                                        onDownloadTorrent?.(selectedTorrent!, false)
-                                    }
-                                }}
-                                disabled={isDownloading || !showPrimary}
-                                className={!showPrimary ? "opacity-40" : undefined}
-                            >
-                                <Text className="font-semibold text-primary-foreground">
-                                    {isDownloading ? "Downloading..." : label}
-                                </Text>
-                            </SheetFooterButton>
-                        )}
+                        <SheetFooterButton
+                            variant="primary"
+                            onPress={() => {
+                                if (pickerStage === "files") {
+                                    onDownloadFile?.(selectedTorrent!, selectedFileId)
+                                } else {
+                                    onDownloadTorrent?.(selectedTorrent!, false)
+                                }
+                            }}
+                            disabled={isDownloading || !showPrimary}
+                            className={!showPrimary ? "opacity-40" : undefined}
+                        >
+                            <Text className="font-semibold text-primary-foreground">
+                                {isDownloading ? "Downloading..." : label}
+                            </Text>
+                        </SheetFooterButton>
                     </View>
                 </SheetFooter>
             )
@@ -302,6 +301,8 @@ export function TorrentStreamPickerSheet(props: TorrentStreamPickerSheetProps) {
         primaryLabel,
         destination,
         onChangeDestination,
+        canChooseFile,
+        canDownloadMissing,
     ])
 
     return (
@@ -740,7 +741,7 @@ function TorrentSelectionStage(props: TorrentSelectionStageProps) {
                 <View className="gap-2">
                     <View className="flex-row justify-between items-center">
                         <FormSectionLabel>Previous Selection</FormSectionLabel>
-                        {usePreviousBatch && (
+                        {usePreviousBatch && mode !== "download" && (
                             <Text className="text-xs text-white/35">Auto-selected on episode tap</Text>
                         )}
                     </View>

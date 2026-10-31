@@ -1,4 +1,5 @@
 import type {
+    Anime_Entry,
     DebridClient_FilePreview,
     HibikeTorrent_AnimeTorrent,
     Torrentstream_FilePreview,
@@ -18,4 +19,27 @@ export function isSameTorrent(
 
     return first.infoHash === second.infoHash
         && first.downloadUrl === second.downloadUrl
+}
+
+export type TorrentConfirmAction = "none" | "pick-file" | "auto-stream" | "stream"
+
+export function torrentConfirmAction(
+    mode: "stream" | "download",
+    torrent: HibikeTorrent_AnimeTorrent | null,
+    autoFile: boolean,
+): TorrentConfirmAction {
+    if (mode === "download") return torrent?.isBatch ? "pick-file" : "none"
+    if (!torrent) return "auto-stream"
+    return torrent.isBatch && !autoFile ? "pick-file" : "stream"
+}
+
+export function canDownloadMissingEpisodes(entry: Anime_Entry): boolean {
+    const missing = entry.downloadInfo?.episodesToDownload?.length ?? 0
+    const total = entry.media?.episodes ?? 0
+
+    return entry.media?.format !== "MOVIE"
+        && entry.media?.status === "FINISHED"
+        && total > 1
+        && missing > 0
+        && missing !== total
 }
