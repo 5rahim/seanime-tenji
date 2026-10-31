@@ -211,7 +211,8 @@ export function useTorrentStreamController({ entry, mode = "stream" }: UseTorren
             setSearchQuery("")
         } else if (searchMode === "simple") {
             const title = entry.media?.title?.romaji || entry.media?.title?.english || entry.media?.title?.userPreferred || ""
-            setSearchQuery(title)
+            // Submitting a typed query switches to simple search in the same update; keep the query
+            setSearchQuery(current => current || title)
         }
     }, [searchMode, entry.media?.title?.romaji, entry.media?.title?.english, entry.media?.title?.userPreferred])
 
