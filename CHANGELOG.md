@@ -4,10 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## v0.4.0
 
+- ⚡️ TV: Added Discover and Settings shortcuts to the empty library screen
 - 🦺 Player(Android TV): Fixed controls and dialogs hidden behind video
 - 🦺 Player(Android TV): Fixed playback getting stuck after quick seeks
+- 🦺 Player(Android): Fixed https streams failing to open
+- 🦺 Player(Android): Fixed black screen when resuming playback
+- 🦺 Player(tvOS): Fixed crash when playing AV1 files
+- 🦺 Player(TV): Fixed Play and Pause buttons on the remote
+- 🦺 Player: Fixed the app freezing when a video stalls
+- 🦺 Player: Fixed stream request headers containing commas
+- 🦺 Player: Fixed preferred subtitle language not applying to subtitles added after the video loads
 - 🦺 Player: Fixed Up next countdown cancelling at the end of an episode
 - 🦺 Playback: Fixed episodes marked as watched when a stream fails
+- 🦺 Download: Fixed batch torrents starting a stream instead of downloading
+- 🦺 Server: Fixed getting sent back to the setup screen after connecting
+- 🦺 TV: Fixed focus getting lost after leaving a text field
+- 🦺 Android: Fixed navigation bar scrim
+- ⬆️ Player(Android): Upgraded mpv
+- ⬆️ Upgraded to React Native 0.88 / Expo SDK 58
 
 ## v0.3.0
 

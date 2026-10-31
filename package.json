@@ -1,7 +1,7 @@
 {
   "name": "seanime-tenji",
   "main": "index.js",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "scripts": {
     "dev:start": "expo start -c",
     "dev:start:ios": "expo start -c --ios",
