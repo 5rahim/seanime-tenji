@@ -153,6 +153,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         isTv -> "mediacodec,mediacodec-copy"
         else -> "mediacodec-copy"
     }
+    private var videoOutputClosed = false
     @Volatile
     private var hwdecResult: Int? = null
     @Volatile
@@ -189,6 +190,9 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
                 MPVLib.setOptionString("demuxer-seekable-cache", "yes")
             }
         }
+
+        // libmpv has no CA store on Android and verifies by default, which fails every https source
+        MPVLib.setOptionString("tls-verify", "no")
 
         // cache & demuxer
         MPVLib.setOptionString("cache", "auto")
@@ -247,6 +251,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
     fun stop() {
         if (!initialized) return
         initialized = false
+        videoOutputClosed = false
         worker.removeCallbacks(statsTask)
         statsLogged = false
         MPVLib.removeObserver(this)
@@ -271,7 +276,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         val previous = videoOutput
         videoOutput = output
 
-        if (!initialized) {
+        if (!initialized || videoOutputClosed) {
             Log.i(TAG, "Video output staged — from=${previous.mpvValue}, requestedVo=${output.mpvValue}")
             return
         }
@@ -296,6 +301,10 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         if (initialized) {
             MPVLib.attachSurface(surface)
             MPVLib.setPropertyString("force-window", "yes")
+            if (videoOutputClosed) {
+                videoOutputClosed = false
+                MPVLib.setPropertyString("vo", videoOutput.mpvValue)
+            }
             Log.i(TAG, "[PiP] attachSurface — attached, activeVo=${getActiveVideoOutput()}")
         }
     }
@@ -304,6 +313,10 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         this.surface = null
         Log.i(TAG, "[PiP] detachSurface — initialized=$initialized")
         if (initialized) {
+            // the video output can't survive losing its surface, so it reopens on the next attach
+            videoOutputClosed = true
+            MPVLib.setPropertyString("vo", "null")
+            MPVLib.setPropertyString("force-window", "no")
             MPVLib.detachSurface()
             Log.i(TAG, "[PiP] detachSurface — detached, activeVo=${getActiveVideoOutput()}")
         }
@@ -398,9 +411,9 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         restoreAudioId = audioId
         restoreSubtitleId = subtitleId
 
-        // http headers
+        // http headers, mpv reads this as a comma separated list so commas in values are escaped
         if (!headers.isNullOrEmpty()) {
-            val headerStr = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
+            val headerStr = headers.entries.joinToString(",") { "${it.key}: ${it.value}".replace(",", "\\,") }
             MPVLib.setPropertyString("http-header-fields", headerStr)
         } else {
             MPVLib.setPropertyString("http-header-fields", "")

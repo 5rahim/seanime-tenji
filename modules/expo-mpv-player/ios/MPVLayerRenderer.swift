@@ -339,9 +339,10 @@ final class MPVLayerRenderer {
             clearProperty(name: "http-header-fields")
             return
         }
+        // mpv reads this as a comma separated list so commas in values are escaped
         let headerString = headers
-            .map { key, value in "\(key): \(value)" }
-            .joined(separator: "\r\n")
+            .map { key, value in "\(key): \(value)".replacingOccurrences(of: ",", with: "\\,") }
+            .joined(separator: ",")
         setProperty(name: "http-header-fields", value: headerString)
     }
 

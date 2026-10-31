@@ -103,6 +103,9 @@ export function useMpvPlayer() {
     // track whether we've applied auto-track + auto-play for the current source
     const hasAppliedDefaultTracks = React.useRef(false)
     const hasAppliedPrefs = React.useRef(false)
+    // external subtitles are added after the file loads, so the preferred track is checked again as they appear
+    const checkedSubtitleTrackCount = React.useRef(0)
+    const hasUserChosenSubtitle = React.useRef(false)
 
     // debounce isLoading -> "buffering" to avoid spinner flashing during seeks
     const bufferingTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -166,6 +169,8 @@ export function useMpvPlayer() {
         tracksLogRef.current = null
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
+        checkedSubtitleTrackCount.current = 0
+        hasUserChosenSubtitle.current = false
         if (bufferingTimerRef.current !== null) {
             clearTimeout(bufferingTimerRef.current)
             bufferingTimerRef.current = null
@@ -435,33 +440,39 @@ export function useMpvPlayer() {
     // Auto-select preferred audio/subtitle tracks once tracks appear
     // ---------------------------------------------------------------------------
     React.useEffect(() => {
-        if (hasAppliedDefaultTracks.current) return
         if (state.audioTracks.length === 0 && state.subtitleTracks.length === 0) return
         if (!viewRef.current) return
 
-        hasAppliedDefaultTracks.current = true
         const prefs = getPlayerPreferences()
 
-        const preferredAudio = findPreferredTrack(state.audioTracks, prefs.preferredAudioLanguages)
-        if (preferredAudio !== null) {
-            const currentAudio = state.audioTracks.find(t => t.selected)
-            if (currentAudio?.id !== preferredAudio) {
-                log.info(`Auto-selecting preferred audio track: ${preferredAudio}`)
-                runNativeCommand("setAudioTrack", nativeRef => nativeRef.setAudioTrack(preferredAudio))
+        if (!hasAppliedDefaultTracks.current) {
+            hasAppliedDefaultTracks.current = true
+
+            const preferredAudio = findPreferredTrack(state.audioTracks, prefs.preferredAudioLanguages)
+            if (preferredAudio !== null) {
+                const currentAudio = state.audioTracks.find(t => t.selected)
+                if (currentAudio?.id !== preferredAudio) {
+                    log.info(`Auto-selecting preferred audio track: ${preferredAudio}`)
+                    runNativeCommand("setAudioTrack", nativeRef => nativeRef.setAudioTrack(preferredAudio))
+                }
+            }
+
+            if (!prefs.showSubtitles) {
+                runNativeCommand("disableSubtitles", ref => ref.disableSubtitles())
             }
         }
 
-        if (prefs.showSubtitles) {
-            const preferredSub = findPreferredTrack(state.subtitleTracks, prefs.preferredSubtitleLanguages, prefs.ignoredSubtitleLabels)
-            if (preferredSub !== null) {
-                const currentSub = state.subtitleTracks.find(t => t.selected)
-                if (currentSub?.id !== preferredSub) {
-                    log.info(`Auto-selecting preferred subtitle track: ${preferredSub}`)
-                    runNativeCommand("setSubtitleTrack", nativeRef => nativeRef.setSubtitleTrack(preferredSub))
-                }
-            }
-        } else {
-            runNativeCommand("disableSubtitles", ref => ref.disableSubtitles())
+        if (!prefs.showSubtitles || hasUserChosenSubtitle.current) return
+        if (state.subtitleTracks.length <= checkedSubtitleTrackCount.current) return
+        checkedSubtitleTrackCount.current = state.subtitleTracks.length
+
+        const preferredSub = findPreferredTrack(state.subtitleTracks, prefs.preferredSubtitleLanguages, prefs.ignoredSubtitleLabels)
+        if (preferredSub === null) return
+
+        const currentSub = state.subtitleTracks.find(t => t.selected)
+        if (currentSub?.id !== preferredSub) {
+            log.info(`Auto-selecting preferred subtitle track: ${preferredSub}`)
+            runNativeCommand("setSubtitleTrack", nativeRef => nativeRef.setSubtitleTrack(preferredSub))
         }
     }, [runNativeCommand, state.audioTracks, state.subtitleTracks])
 
@@ -513,6 +524,7 @@ export function useMpvPlayer() {
 
     const setSubtitleTrack = React.useCallback((trackId: number) => {
         const visible = trackId >= 0
+        hasUserChosenSubtitle.current = true
         if (trackId < 0) {
             runNativeCommand("disableSubtitles", ref => ref.disableSubtitles())
         } else {
@@ -541,6 +553,8 @@ export function useMpvPlayer() {
         durationRef.current = 0
         hasAppliedDefaultTracks.current = false
         hasAppliedPrefs.current = false
+        checkedSubtitleTrackCount.current = 0
+        hasUserChosenSubtitle.current = false
         if (bufferingTimerRef.current !== null) {
             clearTimeout(bufferingTimerRef.current)
             bufferingTimerRef.current = null
@@ -608,6 +622,7 @@ export function useMpvPlayer() {
         const ref = viewRef.current
         if (!ref) return
 
+        hasUserChosenSubtitle.current = true
         try {
             await ref.addSubtitleFile(url, select)
             // re-fetch tracks so the UI reflects the newly added subtitle

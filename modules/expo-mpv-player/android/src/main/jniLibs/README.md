@@ -40,3 +40,4 @@ The recommended source is the [mpv-android](https://github.com/mpv-android/mpv-a
 - **Source:** https://github.com/mpv-android/mpv-android/releases/tag/2026-09-17
 - **Date obtained:** 2026-10-31
 - Keep this release's `libc++_shared.so`. `withLibcppPickFirst` packages it over React Native's copy.
+- This release verifies TLS by default and has no CA store, so `MPVLayerRenderer` sets `tls-verify=no`. Without it every https source fails to open.
