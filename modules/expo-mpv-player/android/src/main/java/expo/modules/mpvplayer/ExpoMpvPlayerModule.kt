@@ -17,6 +17,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.*
@@ -149,11 +150,11 @@ class ExpoMpvPlayerModule : Module() {
             AsyncFunction("isPictureInPictureActive") { view: MpvPlayerView -> view.isPictureInPictureActive() }
 
             // subtitle controls
-            AsyncFunction("getSubtitleTracks") { view: MpvPlayerView -> view.getSubtitleTracks() }
-            AsyncFunction("getChapters") { view: MpvPlayerView -> view.getChapters() }
+            AsyncFunction("getSubtitleTracks") { view: MpvPlayerView, promise: Promise -> view.read(promise, emptyList<Map<String, Any>>()) { it.getSubtitleTracks() } }
+            AsyncFunction("getChapters") { view: MpvPlayerView, promise: Promise -> view.read(promise, emptyList<Map<String, Any>>()) { it.getChapters() } }
             AsyncFunction("setSubtitleTrack") { view: MpvPlayerView, trackId: Int -> view.setSubtitleTrack(trackId) }
             AsyncFunction("disableSubtitles") { view: MpvPlayerView -> view.disableSubtitles() }
-            AsyncFunction("getCurrentSubtitleTrack") { view: MpvPlayerView -> view.getCurrentSubtitleTrack() }
+            AsyncFunction("getCurrentSubtitleTrack") { view: MpvPlayerView, promise: Promise -> view.read(promise, -1) { it.getCurrentSubtitleTrack() } }
             AsyncFunction("addSubtitleFile") { view: MpvPlayerView, url: String, select: Boolean -> view.addSubtitleFile(url, select) }
             AsyncFunction("setSubtitleDelay") { view: MpvPlayerView, delay: Double -> view.setSubtitleDelay(delay) }
             AsyncFunction("setSubtitleFontSize") { view: MpvPlayerView, size: Int -> view.setSubtitleFontSize(size) }
@@ -161,9 +162,9 @@ class ExpoMpvPlayerModule : Module() {
             AsyncFunction("setSubtitlePosition") { view: MpvPlayerView, position: Int -> view.setSubtitlePosition(position) }
 
             // audio controls
-            AsyncFunction("getAudioTracks") { view: MpvPlayerView -> view.getAudioTracks() }
+            AsyncFunction("getAudioTracks") { view: MpvPlayerView, promise: Promise -> view.read(promise, emptyList<Map<String, Any>>()) { it.getAudioTracks() } }
             AsyncFunction("setAudioTrack") { view: MpvPlayerView, trackId: Int -> view.setAudioTrack(trackId) }
-            AsyncFunction("getCurrentAudioTrack") { view: MpvPlayerView -> view.getCurrentAudioTrack() }
+            AsyncFunction("getCurrentAudioTrack") { view: MpvPlayerView, promise: Promise -> view.read(promise, -1) { it.getCurrentAudioTrack() } }
             AsyncFunction("setAudioDelay") { view: MpvPlayerView, delay: Double -> view.setAudioDelay(delay) }
 
             // zoom
@@ -172,7 +173,7 @@ class ExpoMpvPlayerModule : Module() {
             AsyncFunction("isZoomedToFill") { view: MpvPlayerView -> view.isZoomedToFill() }
 
             // technical info
-            AsyncFunction("getTechnicalInfo") { view: MpvPlayerView -> view.getTechnicalInfo() }
+            AsyncFunction("getTechnicalInfo") { view: MpvPlayerView, promise: Promise -> view.read(promise, emptyMap<String, Any>()) { it.getTechnicalInfo() } }
 
             // events
             Events("onLoad", "onPlaybackStateChange", "onProgress", "onError", "onTracksReady", "onPictureInPictureChange")

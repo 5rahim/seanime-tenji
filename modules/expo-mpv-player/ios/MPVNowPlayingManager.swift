@@ -25,24 +25,30 @@ final class MPVNowPlayingManager {
     private var playbackRate: Float = 0
     private var isCommandsSetup = false
     private var artworkTask: URLSessionDataTask?
+    private let audioQueue = DispatchQueue(label: "mpv.player.audio-session", qos: .userInitiated)
 
     private init() {}
 
-    func activateAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .moviePlayback)
-            try session.setActive(true)
-        } catch {
-            print("[NowPlaying] Audio session activation failed: \(error)")
+    func activateAudioSession(completion: @escaping (Result<Void, Error>) -> Void) {
+        audioQueue.async {
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .moviePlayback)
+                try session.setActive(true)
+                DispatchQueue.main.async { completion(.success(())) }
+            } catch {
+                DispatchQueue.main.async { completion(.failure(error)) }
+            }
         }
     }
 
     func deactivateAudioSession() {
-        do {
-            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        } catch {
-            print("[NowPlaying] Audio session deactivation failed: \(error)")
+        audioQueue.async {
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            } catch {
+                print("[NowPlaying] Audio session deactivation failed: \(error)")
+            }
         }
     }
 

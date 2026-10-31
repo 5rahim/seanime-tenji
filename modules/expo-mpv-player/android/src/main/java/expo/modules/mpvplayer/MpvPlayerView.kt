@@ -20,10 +20,12 @@ import android.view.SurfaceView
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import expo.modules.kotlin.AppContext
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 
 private const val TAG = "MpvPlayerView"
+private const val SURFACE_DETACH_TIMEOUT_MS = 1_000L
 
 data class VideoLoadConfig(
     val url: String,
@@ -104,7 +106,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
             val oldWidth = oldRight - oldLeft
             val oldHeight = oldBottom - oldTop
             if (width > 0 && height > 0 && (width != oldWidth || height != oldHeight)) {
-                renderer?.updateSurfaceSize(width, height)
+                mpv { it.updateSurfaceSize(width, height) }
             }
         }
         addView(surfaceView)
@@ -119,11 +121,26 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         }
     }
 
+    private fun mpv(action: (MPVLayerRenderer) -> Unit) {
+        val renderer = renderer ?: return
+        MPVLayerRenderer.run { action(renderer) }
+    }
+
+    fun <T> read(promise: Promise, fallback: T, value: (MPVLayerRenderer) -> T) {
+        val renderer = renderer
+        if (renderer == null) {
+            promise.resolve(fallback)
+            return
+        }
+        MPVLayerRenderer.run { promise.resolve(value(renderer)) }
+    }
+
     override fun surfaceCreated(holder: SurfaceHolder) {
         surfaceReady = true
 
         if (rendererStarted) {
-            renderer?.attachSurface(holder.surface)
+            val surface = holder.surface
+            mpv { it.attachSurface(surface) }
             syncSurfaceSize()
         }
 
@@ -136,13 +153,17 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         if (width > 0 && height > 0) {
-            renderer?.updateSurfaceSize(width, height)
+            mpv { it.updateSurfaceSize(width, height) }
         }
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
-        renderer?.detachSurface()
+        val renderer = renderer ?: return
+        // The surface goes away when this returns.
+        if (!MPVLayerRenderer.runAndWait(SURFACE_DETACH_TIMEOUT_MS) { renderer.detachSurface() }) {
+            Log.w(TAG, "mpv did not detach the surface in time")
+        }
     }
 
     private fun syncSurfaceSize() {
@@ -150,7 +171,7 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         val width = surfaceView.width
         val height = surfaceView.height
         if (width > 0 && height > 0) {
-            renderer?.updateSurfaceSize(width, height)
+            mpv { it.updateSurfaceSize(width, height) }
         }
     }
 
@@ -172,14 +193,14 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     fun applyPendingProps() {
         pendingVideoOutput?.let { output ->
             pendingVideoOutput = null
-            renderer?.setVideoOutput(output)
+            mpv { it.setVideoOutput(output) }
         }
 
         if (!rendererStarted) {
-            renderer?.start()
+            mpv { it.start() }
             rendererStarted = true
             surfaceView.holder.surface?.takeIf { surfaceReady && it.isValid }?.let { surface ->
-                renderer?.attachSurface(surface)
+                mpv { it.attachSurface(surface) }
                 syncSurfaceSize()
             }
         }
@@ -201,12 +222,14 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         cachedDuration = 0.0
         dispatchedPaused = null
 
-        renderer?.load(
-            url = config.url,
-            headers = config.headers,
-            startPosition = config.startPosition,
-            externalSubtitles = config.externalSubtitles
-        )
+        mpv {
+            it.load(
+                url = config.url,
+                headers = config.headers,
+                startPosition = config.startPosition,
+                externalSubtitles = config.externalSubtitles
+            )
+        }
 
         if (config.autoplay) {
             play()
@@ -217,29 +240,29 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
 
     fun play() {
         intendedPlayState = true
-        renderer?.play()
+        mpv { it.play() }
         pipController?.setPlaybackRate(1.0)
         dispatchPauseState(false)
     }
 
     fun pause() {
         intendedPlayState = false
-        renderer?.pause()
+        mpv { it.pause() }
         pipController?.setPlaybackRate(0.0)
         dispatchPauseState(true)
     }
 
     fun seekTo(position: Double) {
         cachedPosition = position
-        renderer?.seekTo(position)
+        mpv { it.seekTo(position) }
     }
 
     fun seekBy(offset: Double) {
-        renderer?.seekBy(offset)
+        mpv { it.seekBy(offset) }
     }
 
     fun setSpeed(speed: Double) {
-        renderer?.setSpeed(speed)
+        mpv { it.setSpeed(speed) }
     }
 
     fun getSpeed(): Double {
@@ -287,77 +310,53 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         onPlaybackStateChange(mapOf("isPiPActive" to active))
     }
 
-    fun getSubtitleTracks(): List<Map<String, Any>> {
-        return renderer?.getSubtitleTracks() ?: emptyList()
-    }
-
-    fun getChapters(): List<Map<String, Any>> {
-        return renderer?.getChapters() ?: emptyList()
-    }
-
     fun setSubtitleTrack(trackId: Int) {
-        renderer?.setSubtitleTrack(trackId)
+        mpv { it.setSubtitleTrack(trackId) }
     }
 
     fun disableSubtitles() {
-        renderer?.disableSubtitles()
-    }
-
-    fun getCurrentSubtitleTrack(): Int {
-        return renderer?.getCurrentSubtitleTrack() ?: -1
+        mpv { it.disableSubtitles() }
     }
 
     fun addSubtitleFile(url: String, select: Boolean) {
-        renderer?.addSubtitleFile(url, select)
+        mpv { it.addSubtitleFile(url, select) }
     }
 
     fun setSubtitleDelay(delay: Double) {
-        renderer?.setSubtitleDelay(delay)
+        mpv { it.setSubtitleDelay(delay) }
     }
 
     fun setSubtitleFontSize(size: Int) {
-        renderer?.setSubtitleFontSize(size)
+        mpv { it.setSubtitleFontSize(size) }
     }
 
     fun setSubtitleVisibility(visible: Boolean) {
-        renderer?.setSubtitleVisibility(visible)
+        mpv { it.setSubtitleVisibility(visible) }
     }
 
     fun setSubtitlePosition(position: Int) {
-        renderer?.setSubtitlePosition(position)
-    }
-
-    fun getAudioTracks(): List<Map<String, Any>> {
-        return renderer?.getAudioTracks() ?: emptyList()
+        mpv { it.setSubtitlePosition(position) }
     }
 
     fun setAudioTrack(trackId: Int) {
-        renderer?.setAudioTrack(trackId)
-    }
-
-    fun getCurrentAudioTrack(): Int {
-        return renderer?.getCurrentAudioTrack() ?: -1
+        mpv { it.setAudioTrack(trackId) }
     }
 
     fun setAudioDelay(delay: Double) {
-        renderer?.setAudioDelay(delay)
+        mpv { it.setAudioDelay(delay) }
     }
 
     fun setVideoZoom(scale: Double) {
-        renderer?.setVideoZoom(scale)
+        mpv { it.setVideoZoom(scale) }
     }
 
     fun setZoomedToFill(zoomed: Boolean) {
         _isZoomedToFill = zoomed
-        renderer?.setZoomedToFill(zoomed)
+        mpv { it.setZoomedToFill(zoomed) }
     }
 
     fun isZoomedToFill(): Boolean {
         return _isZoomedToFill
-    }
-
-    fun getTechnicalInfo(): Map<String, Any> {
-        return renderer?.getTechnicalInfo() ?: emptyMap()
     }
 
     fun getPlayerView(): android.view.View = surfaceView
@@ -512,12 +511,10 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
         if (!pipRecovery && (renderer?.isTv != true || intendedPlayState)) return
 
         val surface = surfaceView.holder.surface.takeIf { it.isValid } ?: return
-        val recovered = renderer?.recoverVideoOutput(
-            surface = surface,
-            playWhenReady = pipRecovery && intendedPlayState,
-        ) == true
+        val playWhenReady = pipRecovery && intendedPlayState
+        mpv { it.recoverVideoOutput(surface = surface, playWhenReady = playWhenReady) }
 
-        if (pipRecovery && recovered) {
+        if (pipRecovery) {
             pipRecoveryPending = false
         }
     }
@@ -525,7 +522,11 @@ class MpvPlayerView(context: Context, appContext: AppContext) : ExpoView(context
     fun cleanup() {
         pipHandler.removeCallbacksAndMessages(null)
         pipController?.stopPictureInPicture()
-        renderer?.stop()
+        renderer?.let { renderer ->
+            if (!MPVLayerRenderer.runAndWait(SURFACE_DETACH_TIMEOUT_MS) { renderer.stop() }) {
+                Log.w(TAG, "mpv did not stop in time")
+            }
+        }
         hostForeground = false
         pipRecoveryPending = false
         surfaceReady = false

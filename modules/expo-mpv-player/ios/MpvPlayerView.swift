@@ -67,9 +67,6 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
         layer.addSublayer(displayLayer)
 
-        // Audio session
-        configureAudioSession()
-
 #if !os(tvOS)
         NotificationCenter.default.addObserver(
             self,
@@ -104,18 +101,6 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
     @objc private func onPhoneLock() {
         pause()
-    }
-
-    // MARK: - Audio Session
-
-    private func configureAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .moviePlayback)
-            try session.setActive(true)
-        } catch {
-            print("[MpvPlayerView] Audio session error: \(error)")
-        }
     }
 
     // MARK: - Source Prop
@@ -156,18 +141,37 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
     }
 
     private func load(_ config: VideoLoadConfig) {
-        renderer?.load(
-            url: config.url,
-            headers: config.headers,
-            externalSubtitles: config.externalSubtitles,
-            startPosition: config.startPosition
-        )
-
-        if config.autoplay {
-            play()
+        withAudioSession { view in
+            view.renderer?.load(
+                url: config.url,
+                headers: config.headers,
+                externalSubtitles: config.externalSubtitles,
+                startPosition: config.startPosition,
+                autoplay: config.autoplay
+            )
+            if config.autoplay {
+                view.startPlayback()
+            }
+            view.onLoad(["url": config.url.absoluteString])
         }
+    }
 
-        onLoad(["url": config.url.absoluteString])
+    private func withAudioSession(_ action: @escaping (MpvSurfaceExpoView) -> Void) {
+        nowPlayingManager.activateAudioSession { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                action(self)
+            case .failure(let error):
+                onError(["error": "Audio session activation failed: \(error.localizedDescription)"])
+            }
+        }
+    }
+
+    private func startPlayback() {
+        setupRemoteCommands()
+        renderer?.play()
+        syncNowPlaying(force: true)
     }
 
     private func applyInlineVideoGravity() {
@@ -179,7 +183,17 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
     }
 
     func setSpeed(_ speed: Double) { renderer?.setSpeed(speed) }
-    func getSpeed() -> Double { return renderer?.getSpeed() ?? 1.0 }
+
+    // Expo view functions run on the main queue, even with runOnQueue. Read mpv off that queue.
+    func read<T>(_ promise: Promise, fallback: T, value: @escaping (MPVLayerRenderer) -> T) {
+        guard let renderer else {
+            promise.resolve(fallback)
+            return
+        }
+        MPVLayerRenderer.work.async {
+            promise.resolve(value(renderer))
+        }
+    }
 
     func isPaused() -> Bool { return renderer?.isPausedState ?? true }
     func getCurrentPosition() -> Double { return renderer?.cachedPosition ?? 0 }
@@ -220,11 +234,8 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
     // MARK: - Subtitle Controls
 
-    func getSubtitleTracks() -> [[String: Any]] { return renderer?.getSubtitleTracks() ?? [] }
-    func getChapters() -> [[String: Any]] { return renderer?.getChapters() ?? [] }
     func setSubtitleTrack(_ trackId: Int) { renderer?.setSubtitleTrack(trackId) }
     func disableSubtitles() { renderer?.disableSubtitles() }
-    func getCurrentSubtitleTrack() -> Int { return renderer?.getCurrentSubtitleTrack() ?? 0 }
     func addSubtitleFile(_ url: String, select: Bool) { renderer?.addSubtitleFile(url: url, select: select) }
     func setSubtitleDelay(_ delay: Double) { renderer?.setSubtitleDelay(delay) }
     func setSubtitleFontSize(_ size: Int) { renderer?.setSubtitleFontSize(size) }
@@ -237,9 +248,7 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
     // MARK: - Audio Controls
 
-    func getAudioTracks() -> [[String: Any]] { return renderer?.getAudioTracks() ?? [] }
     func setAudioTrack(_ trackId: Int) { renderer?.setAudioTrack(trackId) }
-    func getCurrentAudioTrack() -> Int { return renderer?.getCurrentAudioTrack() ?? 0 }
     func setAudioDelay(_ delay: Double) { renderer?.setAudioDelay(delay) }
 
     // MARK: - Zoom
@@ -261,12 +270,6 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
 
     func isZoomedToFill() -> Bool {
         return isZoomedFill
-    }
-
-    // MARK: - Technical Info
-
-    func getTechnicalInfo() -> [String: Any] {
-        return renderer?.getTechnicalInfo() ?? [:]
     }
 
     // MARK: - Now Playing Helpers
@@ -371,6 +374,10 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
         onPlaybackStateChange(["audioDelay": delay])
     }
 
+    func renderer(_ renderer: MPVLayerRenderer, didFail error: String) {
+        onError(["error": error])
+    }
+
     // MARK: - PiPControllerDelegate
 
     func pipController(_ controller: PiPController, willStartPictureInPicture: Bool) {
@@ -431,10 +438,7 @@ final class MpvSurfaceExpoView: ExpoView, MPVLayerRendererDelegate, PiPControlle
     // MARK: - Playback Controls
 
     func play() {
-        nowPlayingManager.activateAudioSession()
-        setupRemoteCommands()
-        renderer?.play()
-        syncNowPlaying(force: true)
+        withAudioSession { $0.startPlayback() }
     }
 
     func pause() {

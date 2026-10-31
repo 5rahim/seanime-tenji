@@ -13,6 +13,7 @@ import MPVKit
 import CoreMedia
 import CoreVideo
 import AVFoundation
+import VideoToolbox
 
 protocol MPVLayerRendererDelegate: AnyObject {
     func renderer(_ renderer: MPVLayerRenderer, didUpdatePosition position: Double, duration: Double, cacheSeconds: Double)
@@ -24,6 +25,7 @@ protocol MPVLayerRendererDelegate: AnyObject {
     func renderer(_ renderer: MPVLayerRenderer, didChangeSpeed speed: Double)
     func renderer(_ renderer: MPVLayerRenderer, didChangeSubtitleDelay delay: Double)
     func renderer(_ renderer: MPVLayerRenderer, didChangeAudioDelay delay: Double)
+    func renderer(_ renderer: MPVLayerRenderer, didFail error: String)
 }
 
 /// Core mpv wrapper using vo_avfoundation for video output.
@@ -35,7 +37,9 @@ final class MPVLayerRenderer {
     }
 
     private let displayLayer: AVSampleBufferDisplayLayer
-    private let queue = DispatchQueue(label: "mpv.avfoundation", qos: .userInitiated)
+    // The video output also calls the main queue while it starts. mpv calls must not wait there.
+    static let work = DispatchQueue(label: "mpv.avfoundation", qos: .userInitiated)
+    private let queue = MPVLayerRenderer.work
     private let stateQueue = DispatchQueue(label: "mpv.avfoundation.state", attributes: .concurrent)
 
     private var mpv: OpaquePointer?
@@ -167,8 +171,10 @@ final class MPVLayerRenderer {
         #else
         checkError(mpv_set_option_string(handle, "hwdec", "videotoolbox"))
         #endif
-        checkError(mpv_set_option_string(handle, "hwdec-codecs", "all"))
+        checkError(mpv_set_option_string(handle, "hwdec-codecs", Self.hardwareDecodeCodecs()))
         checkError(mpv_set_option_string(handle, "hwdec-software-fallback", "yes"))
+
+        checkError(mpv_set_option_string(handle, "pause", "yes"))
 
         // Subtitle settings
         checkError(mpv_set_option_string(handle, "video-zoom", "0"))
@@ -206,9 +212,12 @@ final class MPVLayerRenderer {
         mpv = nil
 
         if let handle {
-            queue.async {
-                mpv_set_wakeup_callback(handle, nil, nil)
-                mpv_terminate_destroy(handle)
+            queue.async { [self] in
+                // mpv's video output still uses the display layer while it tears down on the main queue.
+                withExtendedLifetime(self) {
+                    mpv_set_wakeup_callback(handle, nil, nil)
+                    mpv_terminate_destroy(handle)
+                }
             }
         }
 
@@ -224,13 +233,22 @@ final class MPVLayerRenderer {
         isStopping = false
     }
 
+    // FFmpeg's av1 decoder only decodes in hardware. Without an AV1 decoder, mpv has to rebuild it as dav1d.
+    private static func hardwareDecodeCodecs() -> String {
+        if VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1) {
+            return "all"
+        }
+        return "h264,hevc,vp8,vp9,mpeg1video,mpeg2video,mpeg4,h263,vc1,prores"
+    }
+
     // MARK: - Loading
 
     func load(
         url: URL,
         headers: [String: String]? = nil,
         externalSubtitles: [(url: String, title: String?)]? = nil,
-        startPosition: Double? = nil
+        startPosition: Double? = nil,
+        autoplay: Bool
     ) {
         pendingExternalSubtitles = externalSubtitles ?? []
 
@@ -247,6 +265,7 @@ final class MPVLayerRenderer {
 
             // Stop previous playback
             self.command(handle, ["stop"])
+            self.command(handle, ["set", "pause", autoplay ? "no" : "yes"])
 
             // Set HTTP headers
             self.updateHTTPHeaders(headers)
@@ -273,6 +292,10 @@ final class MPVLayerRenderer {
     // MARK: - Property Helpers
 
     private func setProperty(name: String, value: String) {
+        if Thread.isMainThread {
+            queue.async { [weak self] in self?.setProperty(name: name, value: value) }
+            return
+        }
         guard let handle = mpv else { return }
         let status = mpv_set_property_string(handle, name, value)
         if status < 0 {
@@ -281,6 +304,10 @@ final class MPVLayerRenderer {
     }
 
     private func clearProperty(name: String) {
+        if Thread.isMainThread {
+            queue.async { [weak self] in self?.clearProperty(name: name) }
+            return
+        }
         guard let handle = mpv else { return }
         let status = mpv_set_property(handle, name, MPV_FORMAT_NONE, nil)
         if status < 0 {
@@ -346,10 +373,16 @@ final class MPVLayerRenderer {
         }
     }
 
-    @discardableResult
-    private func commandSync(_ handle: OpaquePointer, _ args: [String]) -> Int32 {
-        guard !args.isEmpty else { return -1 }
-        return withCStringArray(args) { pointer in
+    private func commandSync(_ handle: OpaquePointer, _ args: [String]) {
+        guard !args.isEmpty else { return }
+        if Thread.isMainThread {
+            queue.async { [weak self] in
+                guard let self, self.mpv == handle else { return }
+                self.commandSync(handle, args)
+            }
+            return
+        }
+        _ = withCStringArray(args) { pointer in
             mpv_command(handle, pointer)
         }
     }
@@ -435,6 +468,16 @@ final class MPVLayerRenderer {
             if let property = event.data?.assumingMemoryBound(to: mpv_event_property.self).pointee.name {
                 let name = String(cString: property)
                 refreshProperty(named: name)
+            }
+
+        case MPV_EVENT_END_FILE:
+            if let endFile = event.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee,
+               endFile.reason == MPV_END_FILE_REASON_ERROR {
+                let message = String(cString: mpv_error_string(endFile.error))
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.delegate?.renderer(self, didFail: message)
+                }
             }
 
         case MPV_EVENT_LOG_MESSAGE:

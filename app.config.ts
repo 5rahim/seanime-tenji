@@ -123,7 +123,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             "./plugins/withExpoDownloadManageriOS",
             "./plugins/withExpoOfflineLoggeriOS",
             "expo-updates",
-            "expo-image",
+            ["expo-image", { disableLibdav1d: isTV }],
         ],
         experiments: {
             typedRoutes: true,

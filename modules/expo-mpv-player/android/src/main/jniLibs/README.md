@@ -26,7 +26,7 @@ The recommended source is the [mpv-android](https://github.com/mpv-android/mpv-a
 2. Download the universal debug APK
 3. Extract the `.so` files from `lib/{abi}/` inside the APK (it's a zip)
 4. Place them in the above structure
-5. Remove `libc++_shared.so` from each ABI (React Native already provides it)
+5. Keep `libc++_shared.so` in each ABI. libmpv needs this newer copy instead of React Native's
 
 ### Option B: Build from source
 
@@ -36,6 +36,7 @@ The recommended source is the [mpv-android](https://github.com/mpv-android/mpv-a
 
 ## Pinned Version
 
-- **mpv-android version:** 2026-03-22 release
-- **Source:** https://github.com/mpv-android/mpv-android/releases/tag/2026-03-22
-- **Date obtained:** 2025-07-03
+- **mpv-android version:** 2026-09-17 release (mpv 0b7ed670f, built with NDK r30)
+- **Source:** https://github.com/mpv-android/mpv-android/releases/tag/2026-09-17
+- **Date obtained:** 2026-10-31
+- Keep this release's `libc++_shared.so`. `withLibcppPickFirst` packages it over React Native's copy.

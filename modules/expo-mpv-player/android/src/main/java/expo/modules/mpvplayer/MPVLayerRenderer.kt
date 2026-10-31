@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.system.Os
 import android.util.Log
@@ -13,6 +14,8 @@ import `is`.xyz.mpv.MPVLib
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.math.log2
 
 private const val TAG = "MPVLayerRenderer"
@@ -31,6 +34,32 @@ enum class VideoOutput(val mpvValue: String) {
  * and forwards state changes to its delegate on the main thread.
  */
 class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPVLib.LogObserver {
+
+    companion object {
+        // MPVLib calls wait for mpv's core. Run them in order here so a stalled decoder cannot block the UI thread.
+        private val workerThread = HandlerThread("mpv-worker").apply { start() }
+        private val worker = Handler(workerThread.looper)
+
+        fun run(block: () -> Unit) {
+            if (Looper.myLooper() == workerThread.looper) block() else worker.post(block)
+        }
+
+        fun runAndWait(timeoutMs: Long, block: () -> Unit): Boolean {
+            if (Looper.myLooper() == workerThread.looper) {
+                block()
+                return true
+            }
+            val done = CountDownLatch(1)
+            worker.post {
+                try {
+                    block()
+                } finally {
+                    done.countDown()
+                }
+            }
+            return done.await(timeoutMs, TimeUnit.MILLISECONDS)
+        }
+    }
 
     private fun isTvDevice(): Boolean {
         val manager = context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
@@ -102,6 +131,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
     private var lastProgressUpdateTime: Long = 0
     private val progressIntervalMs: Long = 1000
 
+    @Volatile
     private var initialized = false
     private var surface: Surface? = null
 
@@ -217,7 +247,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
     fun stop() {
         if (!initialized) return
         initialized = false
-        mainHandler.removeCallbacks(statsTask)
+        worker.removeCallbacks(statsTask)
         statsLogged = false
         MPVLib.removeObserver(this)
         MPVLib.removeLogObserver(this)
@@ -358,7 +388,7 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
         isSeeking = false
         isLoading = true
         statsLogged = false
-        mainHandler.removeCallbacks(statsTask)
+        worker.removeCallbacks(statsTask)
         mainHandler.post { delegate?.onLoadingChanged(true) }
 
         currentUrl = url
@@ -1001,8 +1031,8 @@ class MPVLayerRenderer(private val context: Context) : MPVLib.EventObserver, MPV
 
     private fun scheduleStats(delayMs: Long) {
         if (statsLogged) return
-        mainHandler.removeCallbacks(statsTask)
-        mainHandler.postDelayed(statsTask, delayMs)
+        worker.removeCallbacks(statsTask)
+        worker.postDelayed(statsTask, delayMs)
     }
 
     private fun logStats() {

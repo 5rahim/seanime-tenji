@@ -71,6 +71,7 @@ import {
     Pressable as RNPressable,
     StatusBar,
     Text,
+    TVEventControl,
     useTVEventHandler,
     useWindowDimensions,
     View,
@@ -796,6 +797,13 @@ function PlayerScreenInner() {
             controls.scheduleHide()
         }
     })
+
+    // tvOS only reports Menu to BackHandler while the menu key is enabled. Otherwise the native stack pops the player directly.
+    React.useEffect(() => {
+        if (!Platform.isTV || Platform.OS !== "ios") return
+        TVEventControl.enableTVMenuKey()
+        return () => TVEventControl.disableTVMenuKey()
+    }, [])
 
     React.useEffect(() => {
         if (!Platform.isTV) return

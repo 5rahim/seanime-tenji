@@ -96,8 +96,8 @@ public class ExpoMpvPlayerModule: Module {
                 view.setSpeed(speed)
             }
 
-            AsyncFunction("getSpeed") { (view: MpvSurfaceExpoView) -> Double in
-                return view.getSpeed()
+            AsyncFunction("getSpeed") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: 1.0) { $0.getSpeed() }
             }
 
             AsyncFunction("isPaused") { (view: MpvSurfaceExpoView) -> Bool in
@@ -130,12 +130,12 @@ public class ExpoMpvPlayerModule: Module {
             }
 
             // Subtitle controls
-            AsyncFunction("getSubtitleTracks") { (view: MpvSurfaceExpoView) -> [[String: Any]] in
-                return view.getSubtitleTracks()
+            AsyncFunction("getSubtitleTracks") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: [[String: Any]]()) { $0.getSubtitleTracks() }
             }
 
-            AsyncFunction("getChapters") { (view: MpvSurfaceExpoView) -> [[String: Any]] in
-                return view.getChapters()
+            AsyncFunction("getChapters") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: [[String: Any]]()) { $0.getChapters() }
             }
 
             AsyncFunction("setSubtitleTrack") { (view: MpvSurfaceExpoView, trackId: Int) in
@@ -146,8 +146,8 @@ public class ExpoMpvPlayerModule: Module {
                 view.disableSubtitles()
             }
 
-            AsyncFunction("getCurrentSubtitleTrack") { (view: MpvSurfaceExpoView) -> Int in
-                return view.getCurrentSubtitleTrack()
+            AsyncFunction("getCurrentSubtitleTrack") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: 0) { $0.getCurrentSubtitleTrack() }
             }
 
             AsyncFunction("addSubtitleFile") { (view: MpvSurfaceExpoView, url: String, select: Bool) in
@@ -187,16 +187,16 @@ public class ExpoMpvPlayerModule: Module {
             }
 
             // Audio controls
-            AsyncFunction("getAudioTracks") { (view: MpvSurfaceExpoView) -> [[String: Any]] in
-                return view.getAudioTracks()
+            AsyncFunction("getAudioTracks") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: [[String: Any]]()) { $0.getAudioTracks() }
             }
 
             AsyncFunction("setAudioTrack") { (view: MpvSurfaceExpoView, trackId: Int) in
                 view.setAudioTrack(trackId)
             }
 
-            AsyncFunction("getCurrentAudioTrack") { (view: MpvSurfaceExpoView) -> Int in
-                return view.getCurrentAudioTrack()
+            AsyncFunction("getCurrentAudioTrack") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: 0) { $0.getCurrentAudioTrack() }
             }
 
             AsyncFunction("setAudioDelay") { (view: MpvSurfaceExpoView, delay: Double) in
@@ -217,8 +217,8 @@ public class ExpoMpvPlayerModule: Module {
             }
 
             // Technical info
-            AsyncFunction("getTechnicalInfo") { (view: MpvSurfaceExpoView) -> [String: Any] in
-                return view.getTechnicalInfo()
+            AsyncFunction("getTechnicalInfo") { (view: MpvSurfaceExpoView, promise: Promise) in
+                view.read(promise, fallback: [String: Any]()) { $0.getTechnicalInfo() }
             }
 
             // Events
