@@ -112,6 +112,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             ],
             "expo-font",
             "expo-status-bar",
+            ["expo-navigation-bar", { enforceContrast: false }],
             "@react-native-community/datetimepicker",
             "./plugins/withAndroidExternalPlayerQueries",
             "./plugins/withAndroidLanCleartext",

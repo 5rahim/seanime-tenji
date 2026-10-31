@@ -745,8 +745,11 @@ function PlayerScreenInner() {
         if (!Platform.isTV || !event) return
         if (event.eventType === "menu") return
 
-        if (event.eventType === "playPause") {
-            player.togglePlayPause()
+        if (event.eventType === "playPause" || event.eventType === "play" || event.eventType === "pause") {
+            if (tvKeyAction(event) === 0) return
+            if (event.eventType === "play") player.play()
+            else if (event.eventType === "pause") player.pause()
+            else player.togglePlayPause()
             controls.showControls()
             return
         }

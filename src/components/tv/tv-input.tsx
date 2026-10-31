@@ -153,6 +153,7 @@ export const TVInput = React.forwardRef<TVInputHandle, TVInputProps>(
                                         event.stopPropagation()
                                         setEditing(false)
                                         focusState.blur()
+                                        returnFocus()
                                         onBlur?.(event)
                                     }}
                                 />

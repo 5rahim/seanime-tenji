@@ -4,6 +4,7 @@ import { animeEntryPlaybackIntentAtom, createAnimeEntryPlaybackIntent } from "@/
 import { useServerStatus } from "@/atoms/server.atoms"
 import {
     TV,
+    TVButton,
     TVContinueCard,
     TVHeroCarousel,
     type TVHeroItem,
@@ -235,8 +236,16 @@ export function TVLibraryScreen() {
                         {isConnected ? "Your anime library is empty" : "Server is offline"}
                     </Text>
                     <Text className="text-white/45" style={{ fontSize: tvSize(20) }}>
-                        {isConnected ? "Use Discover to find something to watch." : "Reconnect to load the TV library."}
+                        {isConnected ? "Use Discover to find something to watch." : "Reconnect to load your library."}
                     </Text>
+                    <View style={{ marginTop: tvSize(20) }}>
+                        <TVButton
+                            label={isConnected ? "Open Discover" : "Open Settings"}
+                            variant="primary"
+                            hasTVPreferredFocus
+                            onPress={() => router.navigate((isConnected ? "/(app)/(tabs)/discover" : "/(app)/(tabs)/(profile)") as never)}
+                        />
+                    </View>
                 </View>
             </ScrollView>
         )
